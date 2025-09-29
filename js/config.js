@@ -1,8 +1,8 @@
 // Game configuration and constants
 export const config = {
     canvas: {
-        width: 1000,
-        height: 700
+        width: 1200,
+        height: 800
     },
     hex: {
         radius: 15,

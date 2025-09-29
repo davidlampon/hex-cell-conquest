@@ -7,63 +7,37 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>Cellular Conquest</h1>
-            <p>Three-way territorial conflict • Hexagonal battleground</p>
-        </div>
-
-        <div class="stats-panel">
-            <div class="stat-item" id="stat-orange">
-                <div class="stat-color" style="background: #FF9B50;"></div>
-                <div class="stat-info">
-                    <span class="stat-label">Orange</span>
-                    <span class="stat-value" id="orange-percent">33%</span>
-                </div>
-            </div>
-            <div class="stat-item" id="stat-gray">
-                <div class="stat-color" style="background: #E8E8E8;"></div>
-                <div class="stat-info">
-                    <span class="stat-label">Gray</span>
-                    <span class="stat-value" id="gray-percent">33%</span>
-                </div>
-            </div>
-            <div class="stat-item" id="stat-blue">
-                <div class="stat-color" style="background: #4ECDC4;"></div>
-                <div class="stat-info">
-                    <span class="stat-label">Cyan</span>
-                    <span class="stat-value" id="blue-percent">33%</span>
-                </div>
-            </div>
-        </div>
-
+    <div class="game-wrapper">
         <canvas id="canvas"></canvas>
 
-        <div class="controls">
-            <button id="pauseBtn" class="btn-primary">Pause</button>
-            <button id="resetBtn" class="btn-secondary">Reset</button>
-        </div>
+        <!-- Info button for help modal -->
+        <button id="infoBtn" class="info-btn" title="Help & Controls">?</button>
 
-        <div class="speed-controls">
-            <span class="control-label">Speed:</span>
-            <button id="slowBtn" class="btn-speed">0.5x</button>
-            <button id="normalBtn" class="btn-speed active">1x</button>
-            <button id="fastBtn" class="btn-speed">2x</button>
-        </div>
+        <!-- Info modal (hidden by default) -->
+        <div id="infoModal" class="info-modal hidden">
+            <div class="modal-content">
+                <h3>Cellular Conquest</h3>
+                <p class="modal-subtitle">Three-way territorial battle</p>
 
-        <div class="legend">
-            <div class="legend-item">
-                <span class="legend-symbol">+</span>
-                <span>Hunt Mode (Seeking territory)</span>
+                <div class="modal-section">
+                    <h4>Controls</h4>
+                    <ul>
+                        <li><kbd>Space</kbd> - Pause/Resume</li>
+                        <li><kbd>R</kbd> - Reset game</li>
+                        <li><kbd>1</kbd> / <kbd>2</kbd> / <kbd>3</kbd> - Speed (0.5x / 1x / 2x)</li>
+                    </ul>
+                </div>
+
+                <div class="modal-section">
+                    <h4>Agent Modes</h4>
+                    <ul>
+                        <li><strong>+</strong> Hunt Mode - Seeking enemy territory</li>
+                        <li><strong>−</strong> Repel Mode - Too close to others</li>
+                    </ul>
+                </div>
+
+                <button id="closeModal" class="close-modal-btn">Got it!</button>
             </div>
-            <div class="legend-item">
-                <span class="legend-symbol">−</span>
-                <span>Repel Mode (Too close)</span>
-            </div>
-        </div>
-
-        <div class="keyboard-hints">
-            <span>Keyboard: Space (pause) • R (reset) • 1/2/3 (speed)</span>
         </div>
     </div>
 
