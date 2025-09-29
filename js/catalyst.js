@@ -10,17 +10,30 @@ export class Catalyst {
         this.radius = config.catalyst.radius;
         this.targetX = null;
         this.targetY = null;
-        this.mode = 'hunt';
+        this.mode = 'hunt'; // hunt, chase, flee
         this.canvasWidth = canvasWidth;
         this.canvasHeight = canvasHeight;
+    }
+
+    // Predator-Prey chain: Orange > Gray > Cyan > Orange
+    getPrey() {
+        return (this.color + 1) % 3;
+    }
+
+    getPredator() {
+        return (this.color + 2) % 3;
     }
 
     update(catalysts, grid, frameCount) {
         let totalForceX = 0;
         let totalForceY = 0;
-        let inRepulsionZone = false;
 
-        // Inter-catalyst forces
+        let predator = null;
+        let prey = null;
+        let minPredatorDist = Infinity;
+        let minPreyDist = Infinity;
+
+        // Find nearest predator and prey
         catalysts.forEach((other) => {
             if (other === this) return;
 
@@ -28,72 +41,98 @@ export class Catalyst {
             const dy = other.y - this.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
 
-            if (dist > 0) {
-                const normalX = dx / dist;
-                const normalY = dy / dist;
+            // Check if this is my predator
+            if (other.color === this.getPredator() && dist < config.catalyst.predatorDetectionRange) {
+                if (dist < minPredatorDist) {
+                    minPredatorDist = dist;
+                    predator = other;
+                }
+            }
 
-                if (dist < config.catalyst.repulsionDistance) {
-                    const force = config.catalyst.repulsionStrength * (1 - dist / config.catalyst.repulsionDistance);
-                    totalForceX -= normalX * force;
-                    totalForceY -= normalY * force;
-                    inRepulsionZone = true;
-                } else if (dist < config.catalyst.attractionDistance) {
-                    const force = config.catalyst.attractionStrength *
-                        (dist - config.catalyst.repulsionDistance) /
-                        (config.catalyst.attractionDistance - config.catalyst.repulsionDistance);
-                    totalForceX += normalX * force;
-                    totalForceY += normalY * force;
+            // Check if this is my prey
+            if (other.color === this.getPrey() && dist < config.catalyst.preyDetectionRange) {
+                if (dist < minPreyDist) {
+                    minPreyDist = dist;
+                    prey = other;
                 }
             }
         });
 
-        this.mode = inRepulsionZone ? 'repel' : 'hunt';
+        // Predator-prey behavior
+        if (predator) {
+            // FLEE from predator (highest priority)
+            const dx = this.x - predator.x;
+            const dy = this.y - predator.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
 
-        // Target acquisition
-        if (!inRepulsionZone && Math.random() < config.catalyst.targetReacquireChance) {
-            let bestTarget = null;
-            let bestScore = -1;
+            if (dist > 0) {
+                const force = config.catalyst.fleeStrength * (1 - dist / config.catalyst.predatorDetectionRange);
+                totalForceX += (dx / dist) * force;
+                totalForceY += (dy / dist) * force;
+            }
+            this.mode = 'flee';
+        } else if (prey) {
+            // CHASE prey
+            const dx = prey.x - this.x;
+            const dy = prey.y - this.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
 
-            for (let attempts = 0; attempts < config.catalyst.targetSearchAttempts; attempts++) {
-                const testRow = Math.floor(Math.random() * grid.rows);
-                const testCol = Math.floor(Math.random() * grid.cols);
+            if (dist > 0) {
+                const force = config.catalyst.chaseStrength;
+                totalForceX += (dx / dist) * force;
+                totalForceY += (dy / dist) * force;
+            }
+            this.mode = 'chase';
+        } else {
+            // HUNT for enemy territory
+            this.mode = 'hunt';
 
-                if (grid.getCell(testRow, testCol).color !== this.color) {
-                    const { x, y } = grid.getHexCenter(testRow, testCol);
-                    const dist = Math.sqrt((x - this.x) ** 2 + (y - this.y) ** 2);
+            // Target acquisition for enemy territory
+            if (Math.random() < config.catalyst.targetReacquireChance) {
+                let bestTarget = null;
+                let bestScore = -1;
 
-                    const neighbors = grid.getNeighbors(testRow, testCol);
-                    let enemyCount = 0;
-                    neighbors.forEach(({ row: nRow, col: nCol }) => {
-                        if (grid.getCell(nRow, nCol).color !== this.color) enemyCount++;
-                    });
+                for (let attempts = 0; attempts < config.catalyst.targetSearchAttempts; attempts++) {
+                    const testRow = Math.floor(Math.random() * grid.rows);
+                    const testCol = Math.floor(Math.random() * grid.cols);
 
-                    const score = enemyCount * (1 - dist / 1000);
-                    if (score > bestScore) {
-                        bestScore = score;
-                        bestTarget = { x, y };
+                    if (grid.getCell(testRow, testCol).color !== this.color) {
+                        const { x, y } = grid.getHexCenter(testRow, testCol);
+                        const dist = Math.sqrt((x - this.x) ** 2 + (y - this.y) ** 2);
+
+                        const neighbors = grid.getNeighbors(testRow, testCol);
+                        let enemyCount = 0;
+                        neighbors.forEach(({ row: nRow, col: nCol }) => {
+                            if (grid.getCell(nRow, nCol).color !== this.color) enemyCount++;
+                        });
+
+                        const score = enemyCount * (1 - dist / 1000);
+                        if (score > bestScore) {
+                            bestScore = score;
+                            bestTarget = { x, y };
+                        }
                     }
+                }
+
+                if (bestTarget) {
+                    this.targetX = bestTarget.x;
+                    this.targetY = bestTarget.y;
                 }
             }
 
-            if (bestTarget) {
-                this.targetX = bestTarget.x;
-                this.targetY = bestTarget.y;
-            }
-        }
+            // Target steering
+            if (this.targetX && this.targetY) {
+                const dx = this.targetX - this.x;
+                const dy = this.targetY - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
 
-        // Target steering
-        if (this.targetX && this.targetY) {
-            const dx = this.targetX - this.x;
-            const dy = this.targetY - this.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-
-            if (dist > 50) {
-                totalForceX += (dx / dist) * config.catalyst.steerStrength;
-                totalForceY += (dy / dist) * config.catalyst.steerStrength;
-            } else {
-                this.targetX = null;
-                this.targetY = null;
+                if (dist > 50) {
+                    totalForceX += (dx / dist) * config.catalyst.territorySeekStrength;
+                    totalForceY += (dy / dist) * config.catalyst.territorySeekStrength;
+                } else {
+                    this.targetX = null;
+                    this.targetY = null;
+                }
             }
         }
 

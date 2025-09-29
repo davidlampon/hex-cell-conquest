@@ -81,14 +81,19 @@ export class Renderer {
 
             // Draw mode symbol
             this.ctx.fillStyle = '#000000';
-            this.ctx.font = 'bold 16px Arial';
+            this.ctx.font = 'bold 18px Arial';
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
 
-            if (cat.mode === 'repel') {
-                this.ctx.fillText('−', cat.x, cat.y);
+            if (cat.mode === 'flee') {
+                // Fleeing: scared face or retreat arrow
+                this.ctx.fillText('⚠', cat.x, cat.y);
+            } else if (cat.mode === 'chase') {
+                // Chasing: aggressive symbol
+                this.ctx.fillText('⚔', cat.x, cat.y);
             } else {
-                this.ctx.fillText('+', cat.x, cat.y);
+                // Hunting: target symbol
+                this.ctx.fillText('◎', cat.x, cat.y);
             }
         });
     }

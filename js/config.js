@@ -16,15 +16,15 @@ export const config = {
     ],
     catalyst: {
         radius: 14,
-        maxSpeed: 3.5,
+        maxSpeed: 4.5,
         impactRadius: 2.5, // multiplier of hex radius
-        attractionDistance: 250,
-        repulsionDistance: 100,
-        attractionStrength: 0.05,
-        repulsionStrength: 0.3,
-        steerStrength: 0.03,
+        chaseStrength: 0.15, // strength when chasing prey
+        fleeStrength: 0.20, // strength when fleeing from predator
+        territorySeekStrength: 0.05, // strength when seeking enemy territory
         targetSearchAttempts: 20,
-        targetReacquireChance: 0.02
+        targetReacquireChance: 0.03,
+        predatorDetectionRange: 300, // distance to detect predator
+        preyDetectionRange: 350 // distance to detect prey
     },
     grid: {
         updateInterval: 5, // frames between grid updates
