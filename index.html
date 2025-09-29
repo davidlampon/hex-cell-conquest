@@ -1,0 +1,541 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cellular Conquest - Hexagonal Territory Battle</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #1a1a1a 0%, #2d2d2d 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            color: white;
+        }
+        
+        .header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 8px;
+            font-weight: 700;
+        }
+        
+        .header p {
+            color: #999;
+            font-size: 0.9rem;
+        }
+        
+        canvas {
+            border: 2px solid #444;
+            border-radius: 12px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+            display: block;
+        }
+        
+        .controls {
+            display: flex;
+            gap: 12px;
+        }
+        
+        button {
+            padding: 12px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            background: #4ECDC4;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            background: #3db8af;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(78, 205, 196, 0.4);
+        }
+        
+        button:active {
+            transform: translateY(0);
+        }
+        
+        .legend {
+            display: flex;
+            gap: 20px;
+            color: white;
+            font-size: 0.9rem;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .legend-symbol {
+            font-weight: bold;
+            font-size: 1.2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Cellular Conquest</h1>
+            <p>Three-way territorial conflict • Hexagonal battleground</p>
+        </div>
+        
+        <canvas id="canvas"></canvas>
+        
+        <div class="controls">
+            <button id="pauseBtn">Pause</button>
+            <button id="resetBtn">Reset</button>
+        </div>
+        
+        <div class="legend">
+            <div class="legend-item">
+                <span class="legend-symbol">+</span>
+                <span>Hunt Mode (Attraction)</span>
+            </div>
+            <div class="legend-item">
+                <span class="legend-symbol">−</span>
+                <span>Repel Mode (Pushing Away)</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+        const pauseBtn = document.getElementById('pauseBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        
+        let isPaused = false;
+        let animationId = null;
+        let frameCount = 0;
+        
+        // Set canvas size
+        canvas.width = 1000;
+        canvas.height = 700;
+        
+        // Hex grid setup
+        const hexRadius = 15;
+        const hexHeight = hexRadius * 2;
+        const hexWidth = Math.sqrt(3) * hexRadius;
+        const cols = Math.floor(canvas.width / hexWidth) + 2;
+        const rows = Math.floor(canvas.height / (hexHeight * 0.75)) + 2;
+        
+        // Three colors - Orange, White/Gray, Blue
+        const colors = [
+            { light: '#FF9B50', dark: '#D96B2A' },
+            { light: '#E8E8E8', dark: '#B8B8B8' },
+            { light: '#4ECDC4', dark: '#0B7285' }
+        ];
+        
+        let grid = [];
+        let catalysts = [];
+        
+        function initGame() {
+            // Initialize grid
+            grid = [];
+            for (let row = 0; row < rows; row++) {
+                grid[row] = [];
+                for (let col = 0; col < cols; col++) {
+                    let color;
+                    if (col < cols / 3) color = 0;
+                    else if (col < (2 * cols) / 3) color = 1;
+                    else color = 2;
+                    
+                    grid[row][col] = {
+                        color: color,
+                        strength: 3,
+                        lastChanged: 0
+                    };
+                }
+            }
+            
+            // Initialize catalysts
+            catalysts = [
+                { 
+                    x: canvas.width * 0.17, 
+                    y: canvas.height * 0.5, 
+                    vx: 2.2, 
+                    vy: 1.5, 
+                    color: 0, 
+                    radius: 14,
+                    targetX: null,
+                    targetY: null,
+                    mode: 'hunt'
+                },
+                { 
+                    x: canvas.width * 0.5, 
+                    y: canvas.height * 0.5, 
+                    vx: -1.5, 
+                    vy: 2.2, 
+                    color: 1, 
+                    radius: 14,
+                    targetX: null,
+                    targetY: null,
+                    mode: 'hunt'
+                },
+                { 
+                    x: canvas.width * 0.83, 
+                    y: canvas.height * 0.5, 
+                    vx: -2.2, 
+                    vy: -1.5, 
+                    color: 2, 
+                    radius: 14,
+                    targetX: null,
+                    targetY: null,
+                    mode: 'hunt'
+                }
+            ];
+            
+            frameCount = 0;
+        }
+        
+        function getHexCenter(row, col) {
+            const x = col * hexWidth + (row % 2) * (hexWidth / 2);
+            const y = row * (hexHeight * 0.75);
+            return { x, y };
+        }
+        
+        function getNeighbors(row, col) {
+            const isEvenRow = row % 2 === 0;
+            const neighbors = [];
+            const offsets = isEvenRow 
+                ? [[-1, -1], [-1, 0], [0, -1], [0, 1], [1, -1], [1, 0]]
+                : [[-1, 0], [-1, 1], [0, -1], [0, 1], [1, 0], [1, 1]];
+            
+            for (const [dr, dc] of offsets) {
+                const newRow = row + dr;
+                const newCol = col + dc;
+                if (newRow >= 0 && newRow < rows && newCol >= 0 && newCol < cols) {
+                    neighbors.push({ row: newRow, col: newCol });
+                }
+            }
+            return neighbors;
+        }
+        
+        function drawHex(x, y, colorIdx, strength) {
+            ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const angle = (Math.PI / 3) * i - Math.PI / 6;
+                const hx = x + hexRadius * Math.cos(angle);
+                const hy = y + hexRadius * Math.sin(angle);
+                if (i === 0) ctx.moveTo(hx, hy);
+                else ctx.lineTo(hx, hy);
+            }
+            ctx.closePath();
+            
+            const intensity = 0.5 + (strength / 5) * 0.5;
+            ctx.fillStyle = strength > 3 ? colors[colorIdx].dark : colors[colorIdx].light;
+            ctx.globalAlpha = intensity;
+            ctx.fill();
+            ctx.globalAlpha = 1;
+            
+            ctx.strokeStyle = 'rgba(255,255,255,0.1)';
+            ctx.lineWidth = 1;
+            ctx.stroke();
+        }
+        
+        function updateGrid() {
+            const newGrid = grid.map(row => row.map(cell => ({ ...cell })));
+            
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    const neighbors = getNeighbors(row, col);
+                    const counts = [0, 0, 0];
+                    
+                    neighbors.forEach(({ row: nRow, col: nCol }) => {
+                        counts[grid[nRow][nCol].color]++;
+                    });
+                    
+                    const currentColor = grid[row][col].color;
+                    const currentStrength = grid[row][col].strength;
+                    
+                    let maxCount = 0;
+                    let dominantColor = currentColor;
+                    for (let i = 0; i < 3; i++) {
+                        if (i !== currentColor && counts[i] > maxCount) {
+                            maxCount = counts[i];
+                            dominantColor = i;
+                        }
+                    }
+                    
+                    if (maxCount > counts[currentColor]) {
+                        newGrid[row][col].strength = Math.max(0, currentStrength - 0.25);
+                        if (newGrid[row][col].strength === 0) {
+                            newGrid[row][col].color = dominantColor;
+                            newGrid[row][col].strength = 3;
+                            newGrid[row][col].lastChanged = frameCount;
+                        }
+                    } else if (counts[currentColor] >= maxCount) {
+                        newGrid[row][col].strength = Math.min(5, currentStrength + 0.15);
+                    }
+                }
+            }
+            
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    grid[row][col] = newGrid[row][col];
+                }
+            }
+        }
+        
+        function updateCatalysts() {
+            const attractionDistance = 250;
+            const repulsionDistance = 100;
+            const attractionStrength = 0.05;
+            const repulsionStrength = 0.3;
+            
+            catalysts.forEach((cat, i) => {
+                let totalForceX = 0;
+                let totalForceY = 0;
+                let inRepulsionZone = false;
+                
+                catalysts.forEach((other, j) => {
+                    if (i !== j) {
+                        const dx = other.x - cat.x;
+                        const dy = other.y - cat.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (dist > 0) {
+                            const normalX = dx / dist;
+                            const normalY = dy / dist;
+                            
+                            if (dist < repulsionDistance) {
+                                const force = repulsionStrength * (1 - dist / repulsionDistance);
+                                totalForceX -= normalX * force;
+                                totalForceY -= normalY * force;
+                                inRepulsionZone = true;
+                            }
+                            else if (dist < attractionDistance) {
+                                const force = attractionStrength * (dist - repulsionDistance) / (attractionDistance - repulsionDistance);
+                                totalForceX += normalX * force;
+                                totalForceY += normalY * force;
+                            }
+                        }
+                    }
+                });
+                
+                cat.mode = inRepulsionZone ? 'repel' : 'hunt';
+                
+                if (!inRepulsionZone && Math.random() < 0.02) {
+                    let bestTarget = null;
+                    let bestScore = -1;
+                    
+                    for (let attempts = 0; attempts < 20; attempts++) {
+                        const testRow = Math.floor(Math.random() * rows);
+                        const testCol = Math.floor(Math.random() * cols);
+                        
+                        if (grid[testRow][testCol].color !== cat.color) {
+                            const { x, y } = getHexCenter(testRow, testCol);
+                            const dist = Math.sqrt((x - cat.x) ** 2 + (y - cat.y) ** 2);
+                            
+                            const neighbors = getNeighbors(testRow, testCol);
+                            let enemyCount = 0;
+                            neighbors.forEach(({ row: nRow, col: nCol }) => {
+                                if (grid[nRow][nCol].color !== cat.color) enemyCount++;
+                            });
+                            
+                            const score = enemyCount * (1 - dist / 1000);
+                            if (score > bestScore) {
+                                bestScore = score;
+                                bestTarget = { x, y };
+                            }
+                        }
+                    }
+                    
+                    if (bestTarget) {
+                        cat.targetX = bestTarget.x;
+                        cat.targetY = bestTarget.y;
+                    }
+                }
+                
+                if (cat.targetX && cat.targetY) {
+                    const dx = cat.targetX - cat.x;
+                    const dy = cat.targetY - cat.y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (dist > 50) {
+                        const steerStrength = 0.03;
+                        totalForceX += (dx / dist) * steerStrength;
+                        totalForceY += (dy / dist) * steerStrength;
+                    } else {
+                        cat.targetX = null;
+                        cat.targetY = null;
+                    }
+                }
+                
+                cat.vx += totalForceX;
+                cat.vy += totalForceY;
+                
+                const speed = Math.sqrt(cat.vx * cat.vx + cat.vy * cat.vy);
+                const maxSpeed = 3.5;
+                if (speed > maxSpeed) {
+                    cat.vx = (cat.vx / speed) * maxSpeed;
+                    cat.vy = (cat.vy / speed) * maxSpeed;
+                }
+                
+                cat.x += cat.vx;
+                cat.y += cat.vy;
+                
+                if (cat.x < cat.radius || cat.x > canvas.width - cat.radius) {
+                    cat.vx *= -0.9;
+                    cat.x = Math.max(cat.radius, Math.min(canvas.width - cat.radius, cat.x));
+                }
+                if (cat.y < cat.radius || cat.y > canvas.height - cat.radius) {
+                    cat.vy *= -0.9;
+                    cat.y = Math.max(cat.radius, Math.min(canvas.height - cat.radius, cat.y));
+                }
+                
+                const impactRadius = hexRadius * 2.5;
+                for (let row = 0; row < rows; row++) {
+                    for (let col = 0; col < cols; col++) {
+                        const { x, y } = getHexCenter(row, col);
+                        const dx = x - cat.x;
+                        const dy = y - cat.y;
+                        const dist = Math.sqrt(dx * dx + dy * dy);
+                        
+                        if (dist < impactRadius) {
+                            grid[row][col].color = cat.color;
+                            grid[row][col].strength = 5;
+                            grid[row][col].lastChanged = frameCount;
+                        }
+                    }
+                }
+            });
+            
+            for (let i = 0; i < catalysts.length; i++) {
+                for (let j = i + 1; j < catalysts.length; j++) {
+                    const dx = catalysts[j].x - catalysts[i].x;
+                    const dy = catalysts[j].y - catalysts[i].y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    
+                    if (dist < catalysts[i].radius + catalysts[j].radius + 10) {
+                        const angle = Math.atan2(dy, dx);
+                        const cos = Math.cos(angle);
+                        const sin = Math.sin(angle);
+                        
+                        const v1 = catalysts[i].vx * cos + catalysts[i].vy * sin;
+                        const v2 = catalysts[j].vx * cos + catalysts[j].vy * sin;
+                        
+                        const u1 = v2 * 1.1;
+                        const u2 = v1 * 1.1;
+                        
+                        catalysts[i].vx += (u1 - v1) * cos;
+                        catalysts[i].vy += (u1 - v1) * sin;
+                        catalysts[j].vx += (u2 - v2) * cos;
+                        catalysts[j].vy += (u2 - v2) * sin;
+                        
+                        const overlap = (catalysts[i].radius + catalysts[j].radius + 10 - dist);
+                        const pushForce = 2;
+                        catalysts[i].x -= overlap * cos * pushForce;
+                        catalysts[i].y -= overlap * sin * pushForce;
+                        catalysts[j].x += overlap * cos * pushForce;
+                        catalysts[j].y += overlap * sin * pushForce;
+                    }
+                }
+            }
+        }
+        
+        function draw() {
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    const { x, y } = getHexCenter(row, col);
+                    const cell = grid[row][col];
+                    drawHex(x, y, cell.color, cell.strength);
+                }
+            }
+            
+            catalysts.forEach(cat => {
+                ctx.beginPath();
+                ctx.arc(cat.x, cat.y, cat.radius * 2.5, 0, Math.PI * 2);
+                const gradient = ctx.createRadialGradient(cat.x, cat.y, 0, cat.x, cat.y, cat.radius * 2.5);
+                const glowColor = colors[cat.color].light;
+                const r = parseInt(glowColor.slice(1, 3), 16);
+                const g = parseInt(glowColor.slice(3, 5), 16);
+                const b = parseInt(glowColor.slice(5, 7), 16);
+                gradient.addColorStop(0, `rgba(${r},${g},${b},0.4)`);
+                gradient.addColorStop(1, `rgba(${r},${g},${b},0)`);
+                ctx.fillStyle = gradient;
+                ctx.fill();
+                
+                ctx.beginPath();
+                ctx.arc(cat.x, cat.y, cat.radius, 0, Math.PI * 2);
+                ctx.fillStyle = colors[cat.color].light;
+                ctx.fill();
+                ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                ctx.fillStyle = '#000000';
+                ctx.font = 'bold 16px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                if (cat.mode === 'repel') {
+                    ctx.fillText('−', cat.x, cat.y);
+                } else {
+                    ctx.fillText('+', cat.x, cat.y);
+                }
+            });
+        }
+        
+        function animate() {
+            if (!isPaused) {
+                frameCount++;
+                
+                if (frameCount % 5 === 0) {
+                    updateGrid();
+                }
+                
+                updateCatalysts();
+                draw();
+            }
+            
+            animationId = requestAnimationFrame(animate);
+        }
+        
+        pauseBtn.addEventListener('click', () => {
+            isPaused = !isPaused;
+            pauseBtn.textContent = isPaused ? 'Resume' : 'Pause';
+        });
+        
+        resetBtn.addEventListener('click', () => {
+            initGame();
+            if (isPaused) {
+                isPaused = false;
+                pauseBtn.textContent = 'Pause';
+            }
+        });
+        
+        initGame();
+        animate();
+    </script>
+</body>
+</html>
