@@ -13,6 +13,15 @@ export class Catalyst {
         this.mode = 'hunt'; // hunt, chase, flee
         this.canvasWidth = canvasWidth;
         this.canvasHeight = canvasHeight;
+
+        // Death/respawn system
+        this.isAlive = true;
+        this.respawnTimer = 0;
+        this.spawnX = x; // remember spawn position
+        this.spawnY = y;
+
+        // Elimination tracking
+        this.isEliminated = false;
     }
 
     // Predator-Prey chain: Orange > Gray > Cyan > Orange
@@ -24,7 +33,30 @@ export class Catalyst {
         return (this.color + 2) % 3;
     }
 
+    kill() {
+        if (!this.isAlive) return;
+        this.isAlive = false;
+        this.respawnTimer = config.catalyst.respawnDelay;
+    }
+
+    eliminate() {
+        this.isEliminated = true;
+        this.isAlive = false;
+    }
+
     update(catalysts, grid, frameCount) {
+        // Handle respawn countdown
+        if (!this.isAlive && !this.isEliminated) {
+            this.respawnTimer--;
+            if (this.respawnTimer <= 0) {
+                this.respawn();
+            }
+            return; // Don't update while dead
+        }
+
+        // Don't update if eliminated
+        if (this.isEliminated) return;
+
         let totalForceX = 0;
         let totalForceY = 0;
 
@@ -33,9 +65,9 @@ export class Catalyst {
         let minPredatorDist = Infinity;
         let minPreyDist = Infinity;
 
-        // Find nearest predator and prey
+        // Find nearest predator and prey (only alive ones)
         catalysts.forEach((other) => {
-            if (other === this) return;
+            if (other === this || !other.isAlive) return;
 
             const dx = other.x - this.x;
             const dy = other.y - this.y;
@@ -140,11 +172,16 @@ export class Catalyst {
         this.vx += totalForceX;
         this.vy += totalForceY;
 
-        // Speed limiting
+        // Speed limiting - hunters get speed boost
+        let maxSpeed = config.catalyst.maxSpeed;
+        if (this.mode === 'chase') {
+            maxSpeed *= config.catalyst.hunterSpeedBoost;
+        }
+
         const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);
-        if (speed > config.catalyst.maxSpeed) {
-            this.vx = (this.vx / speed) * config.catalyst.maxSpeed;
-            this.vy = (this.vy / speed) * config.catalyst.maxSpeed;
+        if (speed > maxSpeed) {
+            this.vx = (this.vx / speed) * maxSpeed;
+            this.vy = (this.vy / speed) * maxSpeed;
         }
 
         // Update position
@@ -177,42 +214,85 @@ export class Catalyst {
         }
     }
 
+    respawn() {
+        this.isAlive = true;
+        this.x = this.spawnX;
+        this.y = this.spawnY;
+        this.vx = Math.random() * 4 - 2;
+        this.vy = Math.random() * 4 - 2;
+        this.targetX = null;
+        this.targetY = null;
+    }
+
     static handleCollisions(catalysts) {
         for (let i = 0; i < catalysts.length; i++) {
             for (let j = i + 1; j < catalysts.length; j++) {
                 const cat1 = catalysts[i];
                 const cat2 = catalysts[j];
 
+                // Skip if either is dead or eliminated
+                if (!cat1.isAlive || !cat2.isAlive) continue;
+
                 const dx = cat2.x - cat1.x;
                 const dy = cat2.y - cat1.y;
                 const dist = Math.sqrt(dx * dx + dy * dy);
 
                 if (dist < cat1.radius + cat2.radius + 10) {
-                    const angle = Math.atan2(dy, dx);
-                    const cos = Math.cos(angle);
-                    const sin = Math.sin(angle);
+                    // Check for lethal collision (hunter kills prey)
+                    let killer = null;
+                    let victim = null;
 
-                    // Elastic collision with energy boost
-                    const v1 = cat1.vx * cos + cat1.vy * sin;
-                    const v2 = cat2.vx * cos + cat2.vy * sin;
+                    if (cat1.mode === 'chase' && cat2.color === cat1.getPrey()) {
+                        killer = cat1;
+                        victim = cat2;
+                    } else if (cat2.mode === 'chase' && cat1.color === cat2.getPrey()) {
+                        killer = cat2;
+                        victim = cat1;
+                    }
 
-                    const u1 = v2 * 1.1;
-                    const u2 = v1 * 1.1;
+                    if (killer && victim) {
+                        // LETHAL COLLISION - prey dies
+                        victim.kill();
+                        return {
+                            collided: true,
+                            catalyst1: cat1,
+                            catalyst2: cat2,
+                            lethal: true,
+                            killer,
+                            victim
+                        };
+                    } else {
+                        // Normal elastic collision
+                        const angle = Math.atan2(dy, dx);
+                        const cos = Math.cos(angle);
+                        const sin = Math.sin(angle);
 
-                    cat1.vx += (u1 - v1) * cos;
-                    cat1.vy += (u1 - v1) * sin;
-                    cat2.vx += (u2 - v2) * cos;
-                    cat2.vy += (u2 - v2) * sin;
+                        const v1 = cat1.vx * cos + cat1.vy * sin;
+                        const v2 = cat2.vx * cos + cat2.vy * sin;
 
-                    // Separate overlapping catalysts
-                    const overlap = (cat1.radius + cat2.radius + 10 - dist);
-                    const pushForce = 2;
-                    cat1.x -= overlap * cos * pushForce;
-                    cat1.y -= overlap * sin * pushForce;
-                    cat2.x += overlap * cos * pushForce;
-                    cat2.y += overlap * sin * pushForce;
+                        const u1 = v2 * 1.1;
+                        const u2 = v1 * 1.1;
 
-                    return { collided: true, catalyst1: cat1, catalyst2: cat2 };
+                        cat1.vx += (u1 - v1) * cos;
+                        cat1.vy += (u1 - v1) * sin;
+                        cat2.vx += (u2 - v2) * cos;
+                        cat2.vy += (u2 - v2) * sin;
+
+                        // Separate overlapping catalysts
+                        const overlap = (cat1.radius + cat2.radius + 10 - dist);
+                        const pushForce = 2;
+                        cat1.x -= overlap * cos * pushForce;
+                        cat1.y -= overlap * sin * pushForce;
+                        cat2.x += overlap * cos * pushForce;
+                        cat2.y += overlap * sin * pushForce;
+
+                        return {
+                            collided: true,
+                            catalyst1: cat1,
+                            catalyst2: cat2,
+                            lethal: false
+                        };
+                    }
                 }
             }
         }

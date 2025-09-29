@@ -74,7 +74,7 @@ body {
 /* Game Controls */
 .game-controls {
     display: flex;
-    gap: 8px;
+    gap: 0;
     align-items: center;
 }
 
@@ -122,12 +122,22 @@ body {
 .speed-group {
     display: flex;
     gap: 4px;
-    margin-left: 12px;
-    padding-left: 12px;
-    margin-right: 12px;
-    padding-right: 12px;
+    margin: 0 12px;
+    padding: 0 12px;
     border-left: 1px solid rgba(255, 255, 255, 0.2);
     border-right: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.control-btn:not(.info-btn) {
+    margin-right: 8px;
+}
+
+.control-btn:not(.info-btn):last-of-type {
+    margin-right: 0;
+}
+
+.control-btn.info-btn {
+    margin-left: 8px;
 }
 
 .speed-btn.active {

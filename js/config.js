@@ -17,6 +17,7 @@ export const config = {
     catalyst: {
         radius: 14,
         maxSpeed: 4.5,
+        hunterSpeedBoost: 1.4, // hunters are 40% faster
         impactRadius: 2.5, // multiplier of hex radius
         chaseStrength: 0.15, // strength when chasing prey
         fleeStrength: 0.20, // strength when fleeing from predator
@@ -24,7 +25,9 @@ export const config = {
         targetSearchAttempts: 20,
         targetReacquireChance: 0.03,
         predatorDetectionRange: 300, // distance to detect predator
-        preyDetectionRange: 350 // distance to detect prey
+        preyDetectionRange: 350, // distance to detect prey
+        respawnDelay: 300, // frames (5 seconds at 60fps)
+        eliminationThreshold: 0.02 // 2% territory minimum to stay in game
     },
     grid: {
         updateInterval: 5, // frames between grid updates

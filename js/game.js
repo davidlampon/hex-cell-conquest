@@ -109,17 +109,44 @@ class Game {
                 // Create particle effect at collision point
                 const x = (collision.catalyst1.x + collision.catalyst2.x) / 2;
                 const y = (collision.catalyst1.y + collision.catalyst2.y) / 2;
-                this.renderer.createCollisionParticles(
-                    x, y,
-                    collision.catalyst1.color,
-                    collision.catalyst2.color
-                );
+
+                if (collision.lethal) {
+                    // Create death particles for lethal collision
+                    this.renderer.createDeathParticles(
+                        collision.victim.x,
+                        collision.victim.y,
+                        collision.victim.color
+                    );
+                } else {
+                    // Regular collision particles
+                    this.renderer.createCollisionParticles(
+                        x, y,
+                        collision.catalyst1.color,
+                        collision.catalyst2.color
+                    );
+                }
             }
 
             // Update territory stats every 30 frames
             if (this.frameCount % 30 === 0) {
                 const stats = this.grid.getTerritoryStats();
                 this.ui.updateTerritoryStats(stats.percentages);
+
+                // Check for elimination - if territory drops to 0%
+                stats.percentages.forEach((percent, colorIndex) => {
+                    if (percent === 0) {
+                        // Find catalyst of this color and eliminate it
+                        const catalyst = this.catalysts.find(cat => cat.color === colorIndex && !cat.isEliminated);
+                        if (catalyst) {
+                            catalyst.eliminate();
+                            this.renderer.createDeathParticles(
+                                catalyst.x,
+                                catalyst.y,
+                                catalyst.color
+                            );
+                        }
+                    }
+                });
             }
         }
 

@@ -57,6 +57,38 @@ export class Renderer {
 
     drawCatalysts(catalysts) {
         catalysts.forEach(cat => {
+            // Skip eliminated catalysts completely
+            if (cat.isEliminated) return;
+
+            // Handle dead but not eliminated catalysts (respawning)
+            if (!cat.isAlive) {
+                // Draw faint ghost at spawn location
+                const respawnProgress = 1 - (cat.respawnTimer / config.catalyst.respawnDelay);
+                const alpha = 0.2 + respawnProgress * 0.3;
+
+                this.ctx.globalAlpha = alpha;
+                this.ctx.beginPath();
+                this.ctx.arc(cat.spawnX, cat.spawnY, cat.radius, 0, Math.PI * 2);
+                this.ctx.fillStyle = config.colors[cat.color].light;
+                this.ctx.fill();
+                this.ctx.strokeStyle = 'rgba(255,255,255,0.3)';
+                this.ctx.lineWidth = 2;
+                this.ctx.setLineDash([5, 5]);
+                this.ctx.stroke();
+                this.ctx.setLineDash([]);
+                this.ctx.globalAlpha = 1;
+
+                // Draw respawn timer
+                this.ctx.fillStyle = 'rgba(255,255,255,0.7)';
+                this.ctx.font = 'bold 10px Arial';
+                this.ctx.textAlign = 'center';
+                this.ctx.textBaseline = 'middle';
+                const seconds = Math.ceil(cat.respawnTimer / 60);
+                this.ctx.fillText(seconds + 's', cat.spawnX, cat.spawnY);
+                return;
+            }
+
+            // Draw alive catalyst normally
             // Draw glow effect
             this.ctx.beginPath();
             this.ctx.arc(cat.x, cat.y, cat.radius * 2.5, 0, Math.PI * 2);
@@ -111,6 +143,23 @@ export class Renderer {
                 color: i % 2 === 0 ? color1 : color2,
                 life: 1.0,
                 size: 2 + Math.random() * 3
+            });
+        }
+    }
+
+    createDeathParticles(x, y, color) {
+        const particleCount = 40;
+        for (let i = 0; i < particleCount; i++) {
+            const angle = (Math.PI * 2 * i) / particleCount;
+            const speed = 3 + Math.random() * 5;
+            this.particles.push({
+                x,
+                y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                color: color,
+                life: 1.5,
+                size: 3 + Math.random() * 4
             });
         }
     }
