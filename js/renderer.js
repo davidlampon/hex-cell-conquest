@@ -123,6 +123,9 @@ export class Renderer {
             } else if (cat.mode === 'chase') {
                 // Chasing: aggressive symbol
                 this.ctx.fillText('⚔', cat.x, cat.y);
+            } else if (cat.mode === 'gang_up') {
+                // Gang up: double swords (alliance attack)
+                this.ctx.fillText('⚔⚔', cat.x, cat.y);
             } else {
                 // Hunting: target symbol
                 this.ctx.fillText('◎', cat.x, cat.y);

@@ -26,8 +26,19 @@ export const config = {
         targetReacquireChance: 0.03,
         predatorDetectionRange: 300, // distance to detect predator
         preyDetectionRange: 350, // distance to detect prey
-        respawnDelay: 300, // frames (5 seconds at 60fps)
-        eliminationThreshold: 0.02 // 2% territory minimum to stay in game
+        respawnDelay: 300, // frames (5 seconds at 60fps) - base delay
+        eliminationThreshold: 0.05, // 5% territory minimum to stay in game
+        // Territory-based power scaling
+        dominantTerritoryThreshold: 0.40, // 40% territory = dominant
+        dominantSpeedBonus: 1.2, // +20% speed when dominant
+        dominantImpactBonus: 1.5, // +50% impact radius when dominant
+        weakTerritoryThreshold: 0.30, // below 30% = weak
+        weakSpeedPenalty: 0.9, // -10% speed when weak
+        // Dynamic respawn scaling
+        respawnDelayPerTerritoryLoss: 100, // +100 frames per 10% territory lost below 30%
+        maxRespawnDelay: 900, // max 15 seconds (at very low territory)
+        // Gang up strategy
+        gangUpThreshold: 0.10 // gang up when territory difference > 10%
     },
     grid: {
         updateInterval: 5, // frames between grid updates

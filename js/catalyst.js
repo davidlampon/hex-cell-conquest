@@ -10,7 +10,7 @@ export class Catalyst {
         this.radius = config.catalyst.radius;
         this.targetX = null;
         this.targetY = null;
-        this.mode = 'hunt'; // hunt, chase, flee
+        this.mode = 'hunt'; // hunt, chase, flee, gang_up
         this.canvasWidth = canvasWidth;
         this.canvasHeight = canvasHeight;
 
@@ -22,6 +22,11 @@ export class Catalyst {
 
         // Elimination tracking
         this.isEliminated = false;
+
+        // Territory-based stats
+        this.territoryPercent = 0.33; // updated from game
+        this.speedMultiplier = 1.0;
+        this.impactMultiplier = 1.0;
     }
 
     // Predator-Prey chain: Orange > Gray > Cyan > Orange
@@ -36,12 +41,39 @@ export class Catalyst {
     kill() {
         if (!this.isAlive) return;
         this.isAlive = false;
-        this.respawnTimer = config.catalyst.respawnDelay;
+
+        // Dynamic respawn delay based on territory
+        let delay = config.catalyst.respawnDelay;
+        if (this.territoryPercent < config.catalyst.weakTerritoryThreshold) {
+            // Add extra delay for each 10% territory lost below 30%
+            const territoryLoss = (config.catalyst.weakTerritoryThreshold - this.territoryPercent) * 10;
+            delay += territoryLoss * (config.catalyst.respawnDelayPerTerritoryLoss / 10);
+            delay = Math.min(delay, config.catalyst.maxRespawnDelay);
+        }
+
+        this.respawnTimer = Math.floor(delay);
     }
 
     eliminate() {
         this.isEliminated = true;
         this.isAlive = false;
+    }
+
+    updatePowerMultipliers() {
+        // Territory-based power scaling
+        if (this.territoryPercent >= config.catalyst.dominantTerritoryThreshold) {
+            // Dominant: boost speed and impact
+            this.speedMultiplier = config.catalyst.dominantSpeedBonus;
+            this.impactMultiplier = config.catalyst.dominantImpactBonus;
+        } else if (this.territoryPercent < config.catalyst.weakTerritoryThreshold) {
+            // Weak: penalty to speed
+            this.speedMultiplier = config.catalyst.weakSpeedPenalty;
+            this.impactMultiplier = 1.0;
+        } else {
+            // Normal
+            this.speedMultiplier = 1.0;
+            this.impactMultiplier = 1.0;
+        }
     }
 
     update(catalysts, grid, frameCount) {
@@ -57,8 +89,27 @@ export class Catalyst {
         // Don't update if eliminated
         if (this.isEliminated) return;
 
+        // Update territory-based power multipliers
+        this.updatePowerMultipliers();
+
         let totalForceX = 0;
         let totalForceY = 0;
+
+        // Determine gang up strategy - find weakest catalyst
+        const aliveCatalysts = catalysts.filter(c => c.isAlive);
+        let weakestCatalyst = null;
+        let shouldGangUp = false;
+
+        if (aliveCatalysts.length === 3) {
+            // Find the weakest by territory
+            weakestCatalyst = aliveCatalysts.reduce((weakest, cat) =>
+                cat.territoryPercent < weakest.territoryPercent ? cat : weakest
+            );
+
+            // Check if there's significant territory gap (>10%)
+            const territoryGap = Math.max(...aliveCatalysts.map(c => c.territoryPercent)) - weakestCatalyst.territoryPercent;
+            shouldGangUp = territoryGap > config.catalyst.gangUpThreshold && weakestCatalyst !== this;
+        }
 
         let predator = null;
         let prey = null;
@@ -94,8 +145,8 @@ export class Catalyst {
         const preyAlive = prey ? catalysts.find(c => c.color === this.getPrey() && c.isAlive) : null;
 
         // Predator-prey behavior
-        if (predator) {
-            // FLEE from predator (highest priority)
+        if (predator && !shouldGangUp) {
+            // FLEE from predator (highest priority, unless gang up overrides)
             const dx = this.x - predator.x;
             const dy = this.y - predator.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
@@ -106,6 +157,10 @@ export class Catalyst {
                 totalForceY += (dy / dist) * force;
             }
             this.mode = 'flee';
+        } else if (shouldGangUp && weakestCatalyst) {
+            // GANG UP on weakest - target their territory aggressively
+            this.mode = 'gang_up';
+            // This will be handled in territory targeting below
         } else if (prey && preyAlive) {
             // CHASE prey only if prey is alive
             const dx = prey.x - this.x;
@@ -123,7 +178,7 @@ export class Catalyst {
             this.mode = 'hunt';
 
             // Target acquisition for enemy territory
-            if (Math.random() < config.catalyst.targetReacquireChance) {
+            if (Math.random() < config.catalyst.targetReacquireChance || this.mode === 'gang_up') {
                 let bestTarget = null;
                 let bestScore = -1;
 
@@ -157,7 +212,13 @@ export class Catalyst {
                         });
 
                         // Boost score for dead enemy territory or weak cell strength
-                        const enemyPriority = enemyStatus[cell.color].priority;
+                        let enemyPriority = enemyStatus[cell.color].priority;
+
+                        // Gang up mode: massively prioritize weakest catalyst's territory
+                        if (this.mode === 'gang_up' && weakestCatalyst && cell.color === weakestCatalyst.color) {
+                            enemyPriority *= 3; // 3x priority for weakest
+                        }
+
                         const weaknessBonus = (config.grid.maxStrength - cell.strength) / config.grid.maxStrength;
                         const borderBonus = myColorCount > 0 ? 1.5 : 1.0; // prefer cells near our territory
 
@@ -195,8 +256,8 @@ export class Catalyst {
         this.vx += totalForceX;
         this.vy += totalForceY;
 
-        // Speed limiting - hunters get speed boost
-        let maxSpeed = config.catalyst.maxSpeed;
+        // Speed limiting - hunters get speed boost, territory affects speed
+        let maxSpeed = config.catalyst.maxSpeed * this.speedMultiplier;
         if (this.mode === 'chase') {
             maxSpeed *= config.catalyst.hunterSpeedBoost;
         }
@@ -221,8 +282,8 @@ export class Catalyst {
             this.y = Math.max(this.radius, Math.min(this.canvasHeight - this.radius, this.y));
         }
 
-        // Impact on grid
-        const impactRadius = config.hex.radius * config.catalyst.impactRadius;
+        // Impact on grid - territory affects impact radius
+        const impactRadius = config.hex.radius * config.catalyst.impactRadius * this.impactMultiplier;
         for (let row = 0; row < grid.rows; row++) {
             for (let col = 0; col < grid.cols; col++) {
                 const { x, y } = grid.getHexCenter(row, col);

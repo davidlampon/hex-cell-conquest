@@ -132,9 +132,14 @@ class Game {
                 const stats = this.grid.getTerritoryStats();
                 this.ui.updateTerritoryStats(stats.percentages);
 
-                // Check for elimination - if territory drops to 0%
+                // Update each catalyst's territory percentage
+                this.catalysts.forEach(cat => {
+                    cat.territoryPercent = stats.percentages[cat.color] / 100;
+                });
+
+                // Check for elimination - if territory drops below threshold (5%)
                 stats.percentages.forEach((percent, colorIndex) => {
-                    if (percent === 0) {
+                    if (percent <= config.catalyst.eliminationThreshold * 100) {
                         // Find catalyst of this color and eliminate it
                         const catalyst = this.catalysts.find(cat => cat.color === colorIndex && !cat.isEliminated);
                         if (catalyst) {
