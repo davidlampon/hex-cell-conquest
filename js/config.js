@@ -38,7 +38,16 @@ export const config = {
         respawnDelayPerTerritoryLoss: 100, // +100 frames per 10% territory lost below 30%
         maxRespawnDelay: 900, // max 15 seconds (at very low territory)
         // Gang up strategy
-        gangUpThreshold: 0.10 // gang up when territory difference > 10%
+        gangUpThreshold: 0.10, // gang up when territory difference > 10%
+        // Kill streak system
+        killStreakSpeedBonus: 1.3, // +30% speed on double kill
+        killStreakSizeBonus: 1.2, // +20% size on triple kill
+        killStreakDecayTime: 300, // 5 seconds to chain kills
+        // Last Stand comeback
+        lastStandThreshold: 0.15, // <15% territory triggers berserker
+        lastStandSpeedBonus: 2.0, // 2x speed in last stand
+        lastStandImpactBonus: 2.0, // 2x impact in last stand
+        lastStandDuration: 1200 // 20 seconds (60fps)
     },
     grid: {
         updateInterval: 5, // frames between grid updates

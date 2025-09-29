@@ -27,6 +27,16 @@ export class Catalyst {
         this.territoryPercent = 0.33; // updated from game
         this.speedMultiplier = 1.0;
         this.impactMultiplier = 1.0;
+
+        // Kill streak system
+        this.kills = 0;
+        this.killStreak = 0;
+        this.lastKillTime = 0;
+        this.killStreakActive = false;
+
+        // Last Stand system
+        this.lastStandMode = false;
+        this.lastStandTimer = 0;
     }
 
     // Predator-Prey chain: Orange > Gray > Cyan > Orange
@@ -42,6 +52,11 @@ export class Catalyst {
         if (!this.isAlive) return;
         this.isAlive = false;
 
+        // Reset kill streak on death
+        this.killStreak = 0;
+        this.lastKillTime = 0;
+        this.killStreakActive = false;
+
         // Dynamic respawn delay based on territory
         let delay = config.catalyst.respawnDelay;
         if (this.territoryPercent < config.catalyst.weakTerritoryThreshold) {
@@ -54,25 +69,70 @@ export class Catalyst {
         this.respawnTimer = Math.floor(delay);
     }
 
+    registerKill(frameCount) {
+        this.kills++;
+
+        // Check if this extends a kill streak
+        if (frameCount - this.lastKillTime < config.catalyst.killStreakDecayTime) {
+            this.killStreak++;
+        } else {
+            this.killStreak = 1; // Start new streak
+        }
+
+        this.lastKillTime = frameCount;
+        this.killStreakActive = this.killStreak >= 2;
+
+        return this.killStreak; // Return for announcements
+    }
+
     eliminate() {
         this.isEliminated = true;
         this.isAlive = false;
     }
 
-    updatePowerMultipliers() {
-        // Territory-based power scaling
+    updatePowerMultipliers(frameCount) {
+        // Base multipliers from territory
         if (this.territoryPercent >= config.catalyst.dominantTerritoryThreshold) {
-            // Dominant: boost speed and impact
             this.speedMultiplier = config.catalyst.dominantSpeedBonus;
             this.impactMultiplier = config.catalyst.dominantImpactBonus;
         } else if (this.territoryPercent < config.catalyst.weakTerritoryThreshold) {
-            // Weak: penalty to speed
             this.speedMultiplier = config.catalyst.weakSpeedPenalty;
             this.impactMultiplier = 1.0;
         } else {
-            // Normal
             this.speedMultiplier = 1.0;
             this.impactMultiplier = 1.0;
+        }
+
+        // Check for Last Stand mode
+        if (!this.lastStandMode && this.territoryPercent < config.catalyst.lastStandThreshold) {
+            this.lastStandMode = true;
+            this.lastStandTimer = config.catalyst.lastStandDuration;
+        }
+
+        // Last Stand bonuses (override territory bonuses)
+        if (this.lastStandMode && this.lastStandTimer > 0) {
+            this.lastStandTimer--;
+            this.speedMultiplier = config.catalyst.lastStandSpeedBonus;
+            this.impactMultiplier = config.catalyst.lastStandImpactBonus;
+
+            // Time's up - force elimination
+            if (this.lastStandTimer === 0 && this.territoryPercent < config.catalyst.lastStandThreshold) {
+                this.eliminate();
+            }
+        }
+
+        // Kill streak bonuses (stack on top)
+        if (this.killStreakActive && frameCount - this.lastKillTime < config.catalyst.killStreakDecayTime) {
+            if (this.killStreak >= 2) {
+                this.speedMultiplier *= config.catalyst.killStreakSpeedBonus;
+            }
+            if (this.killStreak >= 3) {
+                this.impactMultiplier *= config.catalyst.killStreakSizeBonus;
+            }
+        } else if (this.killStreakActive) {
+            // Streak expired
+            this.killStreakActive = false;
+            this.killStreak = 0;
         }
     }
 
@@ -90,7 +150,7 @@ export class Catalyst {
         if (this.isEliminated) return;
 
         // Update territory-based power multipliers
-        this.updatePowerMultipliers();
+        this.updatePowerMultipliers(frameCount);
 
         let totalForceX = 0;
         let totalForceY = 0;
@@ -308,7 +368,7 @@ export class Catalyst {
         this.targetY = null;
     }
 
-    static handleCollisions(catalysts) {
+    static handleCollisions(catalysts, frameCount) {
         for (let i = 0; i < catalysts.length; i++) {
             for (let j = i + 1; j < catalysts.length; j++) {
                 const cat1 = catalysts[i];
@@ -326,7 +386,16 @@ export class Catalyst {
                     let killer = null;
                     let victim = null;
 
-                    if (cat1.mode === 'chase' && cat2.color === cat1.getPrey()) {
+                    // Last Stand mode: can kill ANY color
+                    if (cat1.lastStandMode && cat1.lastStandTimer > 0) {
+                        killer = cat1;
+                        victim = cat2;
+                    } else if (cat2.lastStandMode && cat2.lastStandTimer > 0) {
+                        killer = cat2;
+                        victim = cat1;
+                    }
+                    // Normal predator-prey rules
+                    else if (cat1.mode === 'chase' && cat2.color === cat1.getPrey()) {
                         killer = cat1;
                         victim = cat2;
                     } else if (cat2.mode === 'chase' && cat1.color === cat2.getPrey()) {
@@ -335,15 +404,17 @@ export class Catalyst {
                     }
 
                     if (killer && victim) {
-                        // LETHAL COLLISION - prey dies
+                        // LETHAL COLLISION - victim dies
                         victim.kill();
+                        const killStreak = killer.registerKill(frameCount);
                         return {
                             collided: true,
                             catalyst1: cat1,
                             catalyst2: cat2,
                             lethal: true,
                             killer,
-                            victim
+                            victim,
+                            killStreak
                         };
                     } else {
                         // Normal elastic collision

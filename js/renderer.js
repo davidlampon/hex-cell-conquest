@@ -88,27 +88,64 @@ export class Renderer {
                 return;
             }
 
-            // Draw alive catalyst normally
-            // Draw glow effect
-            this.ctx.beginPath();
-            this.ctx.arc(cat.x, cat.y, cat.radius * 2.5, 0, Math.PI * 2);
-            const gradient = this.ctx.createRadialGradient(cat.x, cat.y, 0, cat.x, cat.y, cat.radius * 2.5);
-            const glowColor = config.colors[cat.color].light;
-            const r = parseInt(glowColor.slice(1, 3), 16);
-            const g = parseInt(glowColor.slice(3, 5), 16);
-            const b = parseInt(glowColor.slice(5, 7), 16);
-            gradient.addColorStop(0, `rgba(${r},${g},${b},0.4)`);
-            gradient.addColorStop(1, `rgba(${r},${g},${b},0)`);
-            this.ctx.fillStyle = gradient;
-            this.ctx.fill();
+            // Calculate visual size based on kill streak and power
+            const visualRadius = cat.radius * cat.impactMultiplier;
 
-            // Draw catalyst body
+            // Last Stand mode: RED pulsing aura
+            if (cat.lastStandMode && cat.lastStandTimer > 0) {
+                const pulse = 0.5 + 0.5 * Math.sin(Date.now() / 100);
+                this.ctx.beginPath();
+                this.ctx.arc(cat.x, cat.y, visualRadius * 3, 0, Math.PI * 2);
+                const gradient = this.ctx.createRadialGradient(cat.x, cat.y, 0, cat.x, cat.y, visualRadius * 3);
+                gradient.addColorStop(0, `rgba(255,0,0,${0.6 * pulse})`);
+                gradient.addColorStop(1, `rgba(255,0,0,0)`);
+                this.ctx.fillStyle = gradient;
+                this.ctx.fill();
+            }
+            // Kill streak: enhanced glow
+            else if (cat.killStreakActive) {
+                const streakIntensity = Math.min(cat.killStreak / 4, 1);
+                this.ctx.beginPath();
+                this.ctx.arc(cat.x, cat.y, visualRadius * 3, 0, Math.PI * 2);
+                const gradient = this.ctx.createRadialGradient(cat.x, cat.y, 0, cat.x, cat.y, visualRadius * 3);
+                const glowColor = config.colors[cat.color].light;
+                const r = parseInt(glowColor.slice(1, 3), 16);
+                const g = parseInt(glowColor.slice(3, 5), 16);
+                const b = parseInt(glowColor.slice(5, 7), 16);
+                gradient.addColorStop(0, `rgba(${r},${g},${b},${0.6 * streakIntensity})`);
+                gradient.addColorStop(1, `rgba(${r},${g},${b},0)`);
+                this.ctx.fillStyle = gradient;
+                this.ctx.fill();
+            }
+            // Normal glow
+            else {
+                this.ctx.beginPath();
+                this.ctx.arc(cat.x, cat.y, visualRadius * 2.5, 0, Math.PI * 2);
+                const gradient = this.ctx.createRadialGradient(cat.x, cat.y, 0, cat.x, cat.y, visualRadius * 2.5);
+                const glowColor = config.colors[cat.color].light;
+                const r = parseInt(glowColor.slice(1, 3), 16);
+                const g = parseInt(glowColor.slice(3, 5), 16);
+                const b = parseInt(glowColor.slice(5, 7), 16);
+                gradient.addColorStop(0, `rgba(${r},${g},${b},0.4)`);
+                gradient.addColorStop(1, `rgba(${r},${g},${b},0)`);
+                this.ctx.fillStyle = gradient;
+                this.ctx.fill();
+            }
+
+            // Draw catalyst body (size based on power)
             this.ctx.beginPath();
-            this.ctx.arc(cat.x, cat.y, cat.radius, 0, Math.PI * 2);
+            this.ctx.arc(cat.x, cat.y, visualRadius, 0, Math.PI * 2);
             this.ctx.fillStyle = config.colors[cat.color].light;
             this.ctx.fill();
-            this.ctx.strokeStyle = 'rgba(255,255,255,0.8)';
-            this.ctx.lineWidth = 2;
+
+            // Last Stand: Red pulsing border
+            if (cat.lastStandMode && cat.lastStandTimer > 0) {
+                this.ctx.strokeStyle = '#FF0000';
+                this.ctx.lineWidth = 4;
+            } else {
+                this.ctx.strokeStyle = 'rgba(255,255,255,0.8)';
+                this.ctx.lineWidth = 2;
+            }
             this.ctx.stroke();
 
             // Draw mode symbol
@@ -188,10 +225,44 @@ export class Renderer {
         });
     }
 
-    render(grid, catalysts) {
+    drawAnnouncements(announcements) {
+        announcements.forEach((announcement, index) => {
+            announcement.life--;
+
+            if (announcement.life > 0) {
+                // Fade in/out
+                let alpha = 1.0;
+                if (announcement.life < 30) alpha = announcement.life / 30;
+                if (announcement.life > 150) alpha = (180 - announcement.life) / 30;
+
+                this.ctx.globalAlpha = alpha;
+                this.ctx.fillStyle = config.colors[announcement.color].light;
+                this.ctx.strokeStyle = '#000000';
+                this.ctx.lineWidth = 4;
+                this.ctx.font = 'bold 48px Arial';
+                this.ctx.textAlign = 'center';
+                this.ctx.textBaseline = 'middle';
+
+                const y = announcement.y + index * 60;
+                this.ctx.strokeText(announcement.text, this.canvas.width / 2, y);
+                this.ctx.fillText(announcement.text, this.canvas.width / 2, y);
+                this.ctx.globalAlpha = 1;
+            }
+        });
+
+        // Remove expired announcements
+        for (let i = announcements.length - 1; i >= 0; i--) {
+            if (announcements[i].life <= 0) {
+                announcements.splice(i, 1);
+            }
+        }
+    }
+
+    render(grid, catalysts, announcements = []) {
         this.clear();
         this.drawGrid(grid);
         this.updateAndDrawParticles();
         this.drawCatalysts(catalysts);
+        this.drawAnnouncements(announcements);
     }
 }

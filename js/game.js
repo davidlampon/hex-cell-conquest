@@ -3,6 +3,7 @@ import { HexGrid } from './grid.js';
 import { Catalyst } from './catalyst.js';
 import { Renderer } from './renderer.js';
 import { UIController } from './ui.js';
+import { AudioSystem } from './audio.js';
 
 class Game {
     constructor() {
@@ -13,6 +14,7 @@ class Game {
         this.grid = new HexGrid(this.canvas.width, this.canvas.height);
         this.renderer = new Renderer(this.canvas);
         this.ui = new UIController();
+        this.audio = new AudioSystem();
 
         this.catalysts = [];
         this.frameCount = 0;
@@ -20,6 +22,10 @@ class Game {
         this.gameSpeed = 1.0;
         this.animationId = null;
         this.lastCollision = null;
+
+        // Announcements system
+        this.announcements = [];
+        this.lastStandAnnounced = [false, false, false];
 
         this.setupEventHandlers();
         this.initialize();
@@ -81,6 +87,25 @@ class Game {
         this.initialize();
         this.ui.reset();
         this.renderer.particles = []; // Clear particles
+        this.announcements = [];
+        this.lastStandAnnounced = [false, false, false];
+    }
+
+    addAnnouncement(type, color) {
+        let text = '';
+        if (type === 2) text = 'DOUBLE KILL!';
+        else if (type === 3) text = 'TRIPLE KILL!';
+        else if (type >= 4) text = 'DOMINATING!';
+        else if (type === 'laststand') text = 'LAST STAND!';
+
+        if (text) {
+            this.announcements.push({
+                text,
+                color,
+                life: 180, // 3 seconds
+                y: 100
+            });
+        }
     }
 
     update() {
@@ -103,7 +128,7 @@ class Game {
             });
 
             // Handle catalyst collisions
-            const collision = Catalyst.handleCollisions(this.catalysts);
+            const collision = Catalyst.handleCollisions(this.catalysts, this.frameCount);
             if (collision.collided && this.lastCollision !== this.frameCount) {
                 this.lastCollision = this.frameCount;
                 // Create particle effect at collision point
@@ -117,6 +142,23 @@ class Game {
                         collision.victim.y,
                         collision.victim.color
                     );
+
+                    // Audio feedback
+                    this.audio.playKillSound();
+                    this.audio.playDeathSound();
+
+                    // Kill streak announcements and audio
+                    if (collision.killStreak) {
+                        this.addAnnouncement(collision.killStreak, collision.killer.color);
+
+                        if (collision.killStreak === 2) {
+                            this.audio.playDoubleKill();
+                        } else if (collision.killStreak === 3) {
+                            this.audio.playTripleKill();
+                        } else if (collision.killStreak >= 4) {
+                            this.audio.playDominating();
+                        }
+                    }
                 } else {
                     // Regular collision particles
                     this.renderer.createCollisionParticles(
@@ -124,8 +166,18 @@ class Game {
                         collision.catalyst1.color,
                         collision.catalyst2.color
                     );
+                    this.audio.playCollision();
                 }
             }
+
+            // Check for Last Stand mode triggers
+            this.catalysts.forEach(cat => {
+                if (cat.lastStandMode && !this.lastStandAnnounced[cat.color]) {
+                    this.addAnnouncement('laststand', cat.color);
+                    this.audio.playLastStand();
+                    this.lastStandAnnounced[cat.color] = true;
+                }
+            });
 
             // Update territory stats every 30 frames
             if (this.frameCount % 30 === 0) {
@@ -163,7 +215,7 @@ class Game {
 
     animate() {
         this.update();
-        this.renderer.render(this.grid, this.catalysts);
+        this.renderer.render(this.grid, this.catalysts, this.announcements);
         this.animationId = requestAnimationFrame(() => this.animate());
     }
 }
