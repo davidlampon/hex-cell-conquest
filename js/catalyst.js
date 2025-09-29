@@ -90,6 +90,9 @@ export class Catalyst {
             }
         });
 
+        // Check if prey is alive
+        const preyAlive = prey ? catalysts.find(c => c.color === this.getPrey() && c.isAlive) : null;
+
         // Predator-prey behavior
         if (predator) {
             // FLEE from predator (highest priority)
@@ -103,8 +106,8 @@ export class Catalyst {
                 totalForceY += (dy / dist) * force;
             }
             this.mode = 'flee';
-        } else if (prey) {
-            // CHASE prey
+        } else if (prey && preyAlive) {
+            // CHASE prey only if prey is alive
             const dx = prey.x - this.x;
             const dy = prey.y - this.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
@@ -116,7 +119,7 @@ export class Catalyst {
             }
             this.mode = 'chase';
         } else {
-            // HUNT for enemy territory
+            // HUNT for enemy territory (prioritize weaker/dead enemies)
             this.mode = 'hunt';
 
             // Target acquisition for enemy territory
@@ -124,21 +127,41 @@ export class Catalyst {
                 let bestTarget = null;
                 let bestScore = -1;
 
+                // Check which enemies are dead/weak
+                const enemyStatus = [0, 1, 2].map(color => {
+                    if (color === this.color) return { alive: true, priority: 0 };
+                    const enemy = catalysts.find(c => c.color === color);
+                    return {
+                        alive: enemy ? enemy.isAlive : false,
+                        eliminated: enemy ? enemy.isEliminated : true,
+                        priority: enemy && !enemy.isAlive ? 2 : 1 // dead enemies = priority 2
+                    };
+                });
+
                 for (let attempts = 0; attempts < config.catalyst.targetSearchAttempts; attempts++) {
                     const testRow = Math.floor(Math.random() * grid.rows);
                     const testCol = Math.floor(Math.random() * grid.cols);
+                    const cell = grid.getCell(testRow, testCol);
 
-                    if (grid.getCell(testRow, testCol).color !== this.color) {
+                    if (cell.color !== this.color) {
                         const { x, y } = grid.getHexCenter(testRow, testCol);
                         const dist = Math.sqrt((x - this.x) ** 2 + (y - this.y) ** 2);
 
                         const neighbors = grid.getNeighbors(testRow, testCol);
                         let enemyCount = 0;
+                        let myColorCount = 0;
                         neighbors.forEach(({ row: nRow, col: nCol }) => {
-                            if (grid.getCell(nRow, nCol).color !== this.color) enemyCount++;
+                            const nColor = grid.getCell(nRow, nCol).color;
+                            if (nColor !== this.color) enemyCount++;
+                            else myColorCount++;
                         });
 
-                        const score = enemyCount * (1 - dist / 1000);
+                        // Boost score for dead enemy territory or weak cell strength
+                        const enemyPriority = enemyStatus[cell.color].priority;
+                        const weaknessBonus = (config.grid.maxStrength - cell.strength) / config.grid.maxStrength;
+                        const borderBonus = myColorCount > 0 ? 1.5 : 1.0; // prefer cells near our territory
+
+                        const score = enemyCount * enemyPriority * (1 + weaknessBonus) * borderBonus * (1 - dist / 1000);
                         if (score > bestScore) {
                             bestScore = score;
                             bestTarget = { x, y };
