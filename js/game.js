@@ -3,19 +3,16 @@ import { HexGrid } from './grid.js';
 import { Catalyst } from './catalyst.js';
 import { Renderer } from './renderer.js';
 import { UIController } from './ui.js';
-import { OverlayRenderer } from './overlay.js';
 
 class Game {
     constructor() {
         this.canvas = document.getElementById('canvas');
         this.canvas.width = config.canvas.width;
         this.canvas.height = config.canvas.height;
-        this.ctx = this.canvas.getContext('2d');
 
         this.grid = new HexGrid(this.canvas.width, this.canvas.height);
         this.renderer = new Renderer(this.canvas);
-        this.overlay = new OverlayRenderer(this.canvas, this.ctx);
-        this.ui = new UIController(this.canvas);
+        this.ui = new UIController();
 
         this.catalysts = [];
         this.frameCount = 0;
@@ -32,7 +29,6 @@ class Game {
     setupEventHandlers() {
         this.ui.onPause = (paused) => {
             this.isPaused = paused;
-            this.overlay.updatePauseState(paused);
         };
 
         this.ui.onReset = () => {
@@ -41,29 +37,6 @@ class Game {
 
         this.ui.onSpeedChange = (speed) => {
             this.gameSpeed = speed;
-            this.overlay.updateSpeed(speed);
-        };
-
-        // Handle canvas button clicks
-        this.ui.onButtonClick = (x, y) => {
-            const button = this.overlay.getButtonAt(x, y);
-            if (button === 'pause') {
-                this.ui.togglePause();
-            } else if (button === 'reset') {
-                this.reset();
-            } else if (button === 'slow') {
-                this.ui.setSpeed(0.5);
-            } else if (button === 'normal') {
-                this.ui.setSpeed(1.0);
-            } else if (button === 'fast') {
-                this.ui.setSpeed(2.0);
-            }
-        };
-
-        // Handle canvas button hover
-        this.ui.onButtonHover = (x, y) => {
-            const button = this.overlay.getButtonAt(x, y);
-            this.overlay.setHoveredButton(button);
         };
     }
 
@@ -146,7 +119,7 @@ class Game {
             // Update territory stats every 30 frames
             if (this.frameCount % 30 === 0) {
                 const stats = this.grid.getTerritoryStats();
-                this.overlay.updateStats(stats);
+                this.ui.updateTerritoryStats(stats.percentages);
             }
         }
 
@@ -159,7 +132,6 @@ class Game {
     animate() {
         this.update();
         this.renderer.render(this.grid, this.catalysts);
-        this.overlay.render();
         this.animationId = requestAnimationFrame(() => this.animate());
     }
 }

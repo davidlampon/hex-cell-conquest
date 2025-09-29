@@ -7,11 +7,40 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="game-wrapper">
-        <canvas id="canvas"></canvas>
+    <div class="game-container">
+        <!-- Top control bar -->
+        <div class="control-bar">
+            <!-- Territory stats -->
+            <div class="territory-stats">
+                <div class="stat-badge" id="stat-orange">
+                    <span class="stat-dot" style="background: #FF9B50;"></span>
+                    <span class="stat-percent" id="orange-percent">33%</span>
+                </div>
+                <div class="stat-badge" id="stat-gray">
+                    <span class="stat-dot" style="background: #E8E8E8;"></span>
+                    <span class="stat-percent" id="gray-percent">33%</span>
+                </div>
+                <div class="stat-badge" id="stat-blue">
+                    <span class="stat-dot" style="background: #4ECDC4;"></span>
+                    <span class="stat-percent" id="blue-percent">33%</span>
+                </div>
+            </div>
 
-        <!-- Info button for help modal -->
-        <button id="infoBtn" class="info-btn" title="Help & Controls">?</button>
+            <!-- Game controls -->
+            <div class="game-controls">
+                <button id="pauseBtn" class="control-btn primary">Pause</button>
+                <button id="resetBtn" class="control-btn">Reset</button>
+                <div class="speed-group">
+                    <button id="slowBtn" class="speed-btn">0.5x</button>
+                    <button id="normalBtn" class="speed-btn active">1x</button>
+                    <button id="fastBtn" class="speed-btn">2x</button>
+                </div>
+                <button id="infoBtn" class="control-btn info-btn">?</button>
+            </div>
+        </div>
+
+        <!-- Canvas -->
+        <canvas id="canvas"></canvas>
 
         <!-- Info modal (hidden by default) -->
         <div id="infoModal" class="info-modal hidden">

@@ -1,23 +1,59 @@
 export class UIController {
-    constructor(canvas) {
-        this.canvas = canvas;
+    constructor() {
+        // Control buttons
+        this.pauseBtn = document.getElementById('pauseBtn');
+        this.resetBtn = document.getElementById('resetBtn');
+        this.slowBtn = document.getElementById('slowBtn');
+        this.normalBtn = document.getElementById('normalBtn');
+        this.fastBtn = document.getElementById('fastBtn');
         this.infoBtn = document.getElementById('infoBtn');
+
+        // Modal
         this.infoModal = document.getElementById('infoModal');
         this.closeModalBtn = document.getElementById('closeModal');
 
+        // Territory stats
+        this.statOrange = document.getElementById('stat-orange');
+        this.statGray = document.getElementById('stat-gray');
+        this.statBlue = document.getElementById('stat-blue');
+        this.orangePercent = document.getElementById('orange-percent');
+        this.grayPercent = document.getElementById('gray-percent');
+        this.bluePercent = document.getElementById('blue-percent');
+
         this.isPaused = false;
-        this.gameSpeed = 1.0; // 0.5, 1.0, or 2.0
+        this.gameSpeed = 1.0;
 
         this.onPause = null;
         this.onReset = null;
         this.onSpeedChange = null;
-        this.onButtonClick = null;
-        this.onButtonHover = null;
 
         this.setupEventListeners();
     }
 
     setupEventListeners() {
+        // Pause button
+        this.pauseBtn.addEventListener('click', () => {
+            this.togglePause();
+        });
+
+        // Reset button
+        this.resetBtn.addEventListener('click', () => {
+            if (this.onReset) this.onReset();
+        });
+
+        // Speed buttons
+        this.slowBtn.addEventListener('click', () => {
+            this.setSpeed(0.5);
+        });
+
+        this.normalBtn.addEventListener('click', () => {
+            this.setSpeed(1.0);
+        });
+
+        this.fastBtn.addEventListener('click', () => {
+            this.setSpeed(2.0);
+        });
+
         // Info modal
         this.infoBtn.addEventListener('click', () => {
             this.showModal();
@@ -30,28 +66,6 @@ export class UIController {
         this.infoModal.addEventListener('click', (e) => {
             if (e.target === this.infoModal) {
                 this.hideModal();
-            }
-        });
-
-        // Canvas click for controls
-        this.canvas.addEventListener('click', (e) => {
-            const rect = this.canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-
-            if (this.onButtonClick) {
-                this.onButtonClick(x, y);
-            }
-        });
-
-        // Canvas hover for button feedback
-        this.canvas.addEventListener('mousemove', (e) => {
-            const rect = this.canvas.getBoundingClientRect();
-            const x = e.clientX - rect.left;
-            const y = e.clientY - rect.top;
-
-            if (this.onButtonHover) {
-                this.onButtonHover(x, y);
             }
         });
 
@@ -84,15 +98,40 @@ export class UIController {
 
     togglePause() {
         this.isPaused = !this.isPaused;
+        this.pauseBtn.textContent = this.isPaused ? 'Resume' : 'Pause';
         if (this.onPause) this.onPause(this.isPaused);
     }
 
     setSpeed(speed) {
         this.gameSpeed = speed;
+
+        // Update button states
+        this.slowBtn.classList.remove('active');
+        this.normalBtn.classList.remove('active');
+        this.fastBtn.classList.remove('active');
+
+        if (speed === 0.5) this.slowBtn.classList.add('active');
+        else if (speed === 1.0) this.normalBtn.classList.add('active');
+        else if (speed === 2.0) this.fastBtn.classList.add('active');
+
         if (this.onSpeedChange) this.onSpeedChange(speed);
+    }
+
+    updateTerritoryStats(percentages) {
+        this.orangePercent.textContent = `${percentages[0]}%`;
+        this.grayPercent.textContent = `${percentages[1]}%`;
+        this.bluePercent.textContent = `${percentages[2]}%`;
+
+        // Highlight the leader
+        const maxPercent = Math.max(...percentages);
+
+        this.statOrange.classList.toggle('leader', percentages[0] === maxPercent);
+        this.statGray.classList.toggle('leader', percentages[1] === maxPercent);
+        this.statBlue.classList.toggle('leader', percentages[2] === maxPercent);
     }
 
     reset() {
         this.isPaused = false;
+        this.pauseBtn.textContent = 'Pause';
     }
 }
