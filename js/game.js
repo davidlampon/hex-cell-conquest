@@ -43,32 +43,32 @@ class Game {
     initialize() {
         this.grid.initialize();
 
-        // Initialize three catalysts
+        // Initialize three catalysts in triangular formation
         this.catalysts = [
             new Catalyst(
-                this.canvas.width * 0.17,
-                this.canvas.height * 0.5,
-                2.2,
-                1.5,
+                this.canvas.width * 0.5,  // Top center
+                this.canvas.height * 0.2,
                 0,
+                2.5,
+                0, // Orange
                 this.canvas.width,
                 this.canvas.height
             ),
             new Catalyst(
-                this.canvas.width * 0.5,
-                this.canvas.height * 0.5,
-                -1.5,
+                this.canvas.width * 0.2,  // Bottom left
+                this.canvas.height * 0.75,
                 2.2,
-                1,
+                -1.5,
+                1, // Gray
                 this.canvas.width,
                 this.canvas.height
             ),
             new Catalyst(
-                this.canvas.width * 0.83,
-                this.canvas.height * 0.5,
+                this.canvas.width * 0.8,  // Bottom right
+                this.canvas.height * 0.75,
                 -2.2,
                 -1.5,
-                2,
+                2, // Cyan
                 this.canvas.width,
                 this.canvas.height
             )

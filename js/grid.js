@@ -15,13 +15,31 @@ export class HexGrid {
 
     initialize() {
         this.grid = [];
+        const centerX = this.cols / 2;
+        const centerY = this.rows / 2;
+
         for (let row = 0; row < this.rows; row++) {
             this.grid[row] = [];
             for (let col = 0; col < this.cols; col++) {
+                // Triangular territory distribution
+                // Top third: Orange
+                // Bottom-left: Gray
+                // Bottom-right: Cyan
+
                 let color;
-                if (col < this.cols / 3) color = 0;
-                else if (col < (2 * this.cols) / 3) color = 1;
-                else color = 2;
+                const relativeRow = row / this.rows;
+                const relativeCol = col / this.cols;
+
+                if (relativeRow < 0.4) {
+                    // Top section - Orange
+                    color = 0;
+                } else if (relativeCol < 0.5) {
+                    // Bottom-left - Gray
+                    color = 1;
+                } else {
+                    // Bottom-right - Cyan
+                    color = 2;
+                }
 
                 this.grid[row][col] = {
                     color: color,
