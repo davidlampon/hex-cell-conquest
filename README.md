@@ -5,7 +5,7 @@
 
 > A mesmerizing three-way territorial battle simulation on a hexagonal grid, combining cellular automata with autonomous agent AI.
 
-![Cellular Conquest Screenshot](https://via.placeholder.com/800x400/1a1a1a/4ECDC4?text=Cellular+Conquest)
+![Hex Cell Conquest Gameplay](demo.gif)
 
 ## 🎮 [Play Now](https://davidlampon.github.io/hex-cell-conquest/)
 
@@ -13,13 +13,25 @@
 
 ### Gameplay
 - **Three-Way Territory Battle**: Watch Orange, Gray, and Cyan factions fight for dominance
-- **Hexagonal Grid System**: 1000+ hex cells with cellular automata rules
+- **Hexagonal Grid System**: 2000+ hex cells with cellular automata rules
 - **Intelligent AI Agents**: Three autonomous "catalysts" with dynamic behavior modes
-  - 🎯 **Hunt Mode** (+): Actively seeking enemy territory
-  - 🛡️ **Repel Mode** (−): Pushing away when too close to other agents
-- **Real-Time Territory Stats**: Live percentage tracking for each faction
-- **Particle Effects**: Visual feedback on catalyst collisions
-- **Smooth Animations**: Color transitions and cell strength indicators
+  - 🎯 **Hunt Mode** (◎): Actively seeking enemy territory
+  - ⚔️ **Chase Mode** (⚔): Hunting prey in predator-prey chain
+  - ⚠️ **Flee Mode** (⚠): Escaping from predators
+  - ⚔⚔ **Gang Up Mode** (⚔⚔): Two stronger factions target the weakest
+- **Predator-Prey Dynamics**: Orange > Gray > Cyan > Orange
+- **Kill Streak System**:
+  - Double Kill: +30% speed boost with enhanced glow
+  - Triple Kill: +20% size increase with massive aura
+  - Dominating: All bonuses stacked
+- **Last Stand Comeback**: Berserker mode at <15% territory (2x speed, 2x impact, can kill any color)
+- **Territory-Based Power Scaling**: Leaders get stronger, weak factions get penalties
+- **Dynamic Respawn Delays**: Losing factions stay dead longer
+- **Audio Feedback**: Kill sounds, death explosions, epic kill streak chords
+- **Visual Announcements**: Large on-screen text for major events
+- **Real-Time Territory Stats**: Live percentage tracking with elimination at 5%
+- **Particle Effects**: Visual feedback on collisions and deaths
+- **Smooth Animations**: Color transitions, cell strength indicators, pulsing auras
 
 ### Controls
 - **Pause/Resume**: Space bar or button click
@@ -37,12 +49,14 @@ The project is built with clean, modular JavaScript using ES6 modules:
 hex-cell-conquest/
 ├── index.html          # Main HTML structure
 ├── styles.css          # All styling and responsive design
+├── demo.gif            # Gameplay demonstration
 ├── js/
 │   ├── config.js       # Game constants and configuration
 │   ├── game.js         # Main game controller and animation loop
 │   ├── grid.js         # HexGrid class - hexagonal grid system
 │   ├── catalyst.js     # Catalyst class - AI agent behavior
 │   ├── renderer.js     # Renderer class - canvas drawing
+│   ├── audio.js        # AudioSystem class - Web Audio API sounds
 │   └── ui.js           # UIController class - controls & stats
 └── README.md
 ```
@@ -62,16 +76,32 @@ hex-cell-conquest/
 - Calculates territory statistics
 
 **`catalyst.js`** - Agent AI & Physics
-- Force-based movement with attraction/repulsion
-- Smart target acquisition (samples grid for high-value positions)
-- Collision detection and elastic response
+- Predator-prey behavior (Orange > Gray > Cyan > Orange)
+- Gang-up strategy targeting weakest faction
+- Kill streak tracking and bonuses
+- Last Stand berserker mode
+- Force-based movement with smart target acquisition
+- Collision detection with lethal kills
 - Territory conversion on contact
+- Dynamic respawn delays based on territory
 
 **`renderer.js`** - Canvas Rendering
 - Hexagon drawing with strength-based alpha
 - Smooth color transition effects
-- Catalyst glow effects with radial gradients
-- Particle system for collision effects
+- Dynamic catalyst sizing based on power
+- Kill streak visual effects (enhanced glow, size increase)
+- Last Stand red pulsing aura
+- Particle system for collision and death effects
+- On-screen announcements with fade in/out
+
+**`audio.js`** - Sound System
+- Web Audio API for procedural sound generation
+- Kill sounds (descending tones)
+- Death explosions (noise bursts)
+- Kill streak chords (Double/Triple/Dominating)
+- Last Stand dramatic tones
+- Collision beeps
+- Master volume control
 
 **`ui.js`** - User Interface
 - Event handling for buttons and keyboard
@@ -82,8 +112,11 @@ hex-cell-conquest/
 **`game.js`** - Main Controller
 - Animation loop coordination
 - Game state management
+- Kill streak and announcement handling
+- Audio integration
 - Update scheduling (grid updates every 5 frames)
 - Speed multiplier implementation
+- Territory-based elimination checks
 
 ## 🎯 Game Mechanics
 
@@ -95,25 +128,61 @@ Each hex cell has:
 Cells strengthen when surrounded by allies, weaken when outnumbered by enemies. When strength reaches 0, the cell flips to the dominant enemy color.
 
 ### Catalyst AI Behavior
-Catalysts use multi-layered AI:
+Catalysts use sophisticated multi-layered AI:
 
-1. **Inter-Agent Forces**
-   - Repulsion within 100px (prevents clustering)
-   - Attraction between 100-250px (maintains engagement)
+1. **Predator-Prey Chain**
+   - Orange hunts Gray, Gray hunts Cyan, Cyan hunts Orange
+   - Catalysts flee from predators and chase prey
+   - Hunters get 40% speed boost when chasing
 
-2. **Target Acquisition**
+2. **Gang Up Strategy**
+   - When all 3 alive, two stronger factions target weakest (>10% gap)
+   - 3x priority for weakest faction's territory
+   - Overrides flee behavior for strategic aggression
+
+3. **Territory-Based Power Scaling**
+   - **>40% territory**: +20% speed, +50% impact radius (dominant)
+   - **<30% territory**: -10% speed (struggling)
+   - Creates snowball effect for victories
+
+4. **Kill Streak Bonuses**
+   - **Double Kill** (2): +30% speed for 10 sec
+   - **Triple Kill** (3): +20% size increase
+   - **Dominating** (4+): All bonuses stack
+   - 5-second window to chain kills
+
+5. **Last Stand Mode**
+   - Triggers at <15% territory
+   - 2x speed, 2x impact radius
+   - Can kill ANY color (ignores predator-prey)
+   - 20 seconds before forced elimination
+   - Red pulsing aura
+
+6. **Dynamic Respawn**
+   - Base: 5 seconds
+   - Weak territories (<30%): up to 15 seconds
+   - Gives winners time to capitalize
+
+7. **Target Acquisition**
    - Samples 20 random grid positions
-   - Scores based on enemy density and distance
-   - Reacquires targets with 2% probability per frame
+   - Prioritizes dead enemy territory (2x)
+   - Scores based on weakness, borders, distance
+   - Reacquires with 3% probability per frame
 
-3. **Movement Physics**
-   - Max speed: 3.5 px/frame
+8. **Movement Physics**
+   - Max speed: 4.5 px/frame (scales with territory)
    - Boundary collision with damping (90% velocity retention)
-   - Elastic inter-catalyst collisions with 110% energy boost
+   - Lethal collisions when hunting prey
 
-4. **Territory Impact**
-   - Converts cells within 37.5px (2.5× hex radius)
+9. **Territory Impact**
+   - Converts cells within impact radius (scales with power)
    - Sets converted cells to maximum strength
+   - Dominant factions paint 50% larger area
+
+### Victory Conditions
+- Reduce enemy to <5% territory for elimination
+- Last faction standing wins
+- Typical game: 5-8 minutes
 
 ## 🚀 Development
 

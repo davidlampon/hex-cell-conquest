@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cellular Conquest - Hexagonal Territory Battle</title>
+    <title>Hex Cell Conquest - Hexagonal Territory Battle</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -45,8 +45,8 @@
         <!-- Info modal (hidden by default) -->
         <div id="infoModal" class="info-modal hidden">
             <div class="modal-content">
-                <h3>Cellular Conquest</h3>
-                <p class="modal-subtitle">Three-way territorial battle</p>
+                <h3>Hex Cell Conquest</h3>
+                <p class="modal-subtitle">Territorial battle with predator-prey dynamics</p>
 
                 <div class="modal-section">
                     <h4>Controls</h4>
@@ -62,7 +62,8 @@
                     <p style="color: #ccc; font-size: 0.9rem; margin-bottom: 8px;">
                         🟠 Orange beats Gray<br>
                         ⚪ Gray beats Cyan<br>
-                        🔵 Cyan beats Orange
+                        🔵 Cyan beats Orange<br>
+                        <em>Hunters get 40% speed boost!</em>
                     </p>
                 </div>
 
@@ -70,8 +71,19 @@
                     <h4>Agent Modes</h4>
                     <ul>
                         <li><strong>◎</strong> Hunt - Seeking enemy territory</li>
-                        <li><strong>⚔</strong> Chase - Pursuing prey</li>
+                        <li><strong>⚔</strong> Chase - Pursuing prey (can kill!)</li>
                         <li><strong>⚠</strong> Flee - Running from predator</li>
+                        <li><strong>⚔⚔</strong> Gang Up - Two vs weakest</li>
+                    </ul>
+                </div>
+
+                <div class="modal-section">
+                    <h4>Special Mechanics</h4>
+                    <ul>
+                        <li><strong>Kill Streaks:</strong> Chain kills for bonuses!</li>
+                        <li><strong>Last Stand:</strong> &lt;15% territory = Berserker mode (2x power)</li>
+                        <li><strong>Power Scaling:</strong> Leaders get stronger, weak get penalties</li>
+                        <li><strong>Victory:</strong> Eliminate enemies below 5% territory</li>
                     </ul>
                 </div>
 
