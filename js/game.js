@@ -44,6 +44,13 @@ class Game {
         this.ui.onSpeedChange = (speed) => {
             this.gameSpeed = speed;
         };
+
+        this.ui.onAudioToggle = () => {
+            return this.audio.toggleMusic();
+        };
+
+        // Set initial audio button state
+        this.ui.audioBtn.textContent = this.audio.musicEnabled ? '🔊' : '🔇';
     }
 
     initialize() {
@@ -188,6 +195,22 @@ class Game {
                 this.catalysts.forEach(cat => {
                     cat.territoryPercent = stats.percentages[cat.color] / 100;
                 });
+
+                // Update music state based on game situation
+                const aliveCatalysts = this.catalysts.filter(c => !c.isEliminated).length;
+                const inLastStand = this.catalysts.some(c => c.lastStandMode);
+                const maxTerritory = Math.max(...stats.percentages);
+                const minTerritory = Math.min(...stats.percentages);
+
+                if (aliveCatalysts === 2) {
+                    this.audio.setMusicState('victory');
+                } else if (inLastStand) {
+                    this.audio.setMusicState('laststand');
+                } else if (maxTerritory > 45 || minTerritory < 20) {
+                    this.audio.setMusicState('intense');
+                } else {
+                    this.audio.setMusicState('calm');
+                }
 
                 // Check for elimination - if territory drops below threshold (5%)
                 stats.percentages.forEach((percent, colorIndex) => {

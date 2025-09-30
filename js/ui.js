@@ -6,6 +6,7 @@ export class UIController {
         this.slowBtn = document.getElementById('slowBtn');
         this.normalBtn = document.getElementById('normalBtn');
         this.fastBtn = document.getElementById('fastBtn');
+        this.audioBtn = document.getElementById('audioBtn');
         this.infoBtn = document.getElementById('infoBtn');
 
         // Modal
@@ -26,6 +27,7 @@ export class UIController {
         this.onPause = null;
         this.onReset = null;
         this.onSpeedChange = null;
+        this.onAudioToggle = null;
 
         this.setupEventListeners();
     }
@@ -52,6 +54,11 @@ export class UIController {
 
         this.fastBtn.addEventListener('click', () => {
             this.setSpeed(2.0);
+        });
+
+        // Audio button
+        this.audioBtn.addEventListener('click', () => {
+            this.toggleAudio();
         });
 
         // Info modal
@@ -82,6 +89,8 @@ export class UIController {
                 this.setSpeed(1.0);
             } else if (e.code === 'Digit3') {
                 this.setSpeed(2.0);
+            } else if (e.code === 'KeyM') {
+                this.toggleAudio();
             } else if (e.code === 'Escape') {
                 this.hideModal();
             }
@@ -100,6 +109,13 @@ export class UIController {
         this.isPaused = !this.isPaused;
         this.pauseBtn.textContent = this.isPaused ? 'Resume' : 'Pause';
         if (this.onPause) this.onPause(this.isPaused);
+    }
+
+    toggleAudio() {
+        if (this.onAudioToggle) {
+            const musicEnabled = this.onAudioToggle();
+            this.audioBtn.textContent = musicEnabled ? '🔊' : '🔇';
+        }
     }
 
     setSpeed(speed) {
