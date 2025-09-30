@@ -37,6 +37,15 @@ export class Catalyst {
         // Last Stand system
         this.lastStandMode = false;
         this.lastStandTimer = 0;
+
+        // Power-up effects
+        this.hasShield = false;
+        this.shieldTimer = 0;
+        this.hasSpeedBoost = false;
+        this.speedBoostTimer = 0;
+
+        // Evolution system
+        this.evolutionStage = 0;
     }
 
     // Predator-Prey chain: Orange > Gray > Cyan > Orange
@@ -50,12 +59,24 @@ export class Catalyst {
 
     kill() {
         if (!this.isAlive) return;
+
+        // Shield blocks death!
+        if (this.hasShield && this.shieldTimer > 0) {
+            return; // Invulnerable!
+        }
+
         this.isAlive = false;
 
         // Reset kill streak on death
         this.killStreak = 0;
         this.lastKillTime = 0;
         this.killStreakActive = false;
+
+        // Clear power-ups on death
+        this.hasShield = false;
+        this.shieldTimer = 0;
+        this.hasSpeedBoost = false;
+        this.speedBoostTimer = 0;
 
         // Dynamic respawn delay based on territory
         let delay = config.catalyst.respawnDelay;
@@ -72,6 +93,9 @@ export class Catalyst {
     registerKill(frameCount) {
         this.kills++;
 
+        // Update evolution stage
+        this.updateEvolution();
+
         // Check if this extends a kill streak
         if (frameCount - this.lastKillTime < config.catalyst.killStreakDecayTime) {
             this.killStreak++;
@@ -83,6 +107,56 @@ export class Catalyst {
         this.killStreakActive = this.killStreak >= 2;
 
         return this.killStreak; // Return for announcements
+    }
+
+    updateEvolution() {
+        // Determine evolution stage based on kills
+        const stages = config.evolution.stages;
+        for (let i = stages.length - 1; i >= 0; i--) {
+            if (this.kills >= stages[i].kills) {
+                this.evolutionStage = i;
+                break;
+            }
+        }
+    }
+
+    activateShield() {
+        this.hasShield = true;
+        this.shieldTimer = config.powerups.types.shield.duration;
+    }
+
+    activateSpeedBoost() {
+        this.hasSpeedBoost = true;
+        this.speedBoostTimer = config.powerups.types.speed.duration;
+    }
+
+    getTerritorySpeedMultiplier(grid) {
+        // Find the hex cell we're currently on
+        let currentColor = null;
+
+        for (let row = 0; row < grid.rows; row++) {
+            for (let col = 0; col < grid.cols; col++) {
+                const { x, y } = grid.getHexCenter(row, col);
+                const dx = x - this.x;
+                const dy = y - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < config.hex.radius) {
+                    currentColor = grid.getCell(row, col).color;
+                    break;
+                }
+            }
+            if (currentColor !== null) break;
+        }
+
+        // Apply territory bonuses
+        if (currentColor === this.color) {
+            return config.territory.ownTerritorySpeedBonus; // +20% on own territory
+        } else if (currentColor !== null && currentColor !== this.color) {
+            return config.territory.enemyTerritorySpeedPenalty; // -10% on enemy territory
+        }
+
+        return 1.0; // Neutral
     }
 
     eliminate() {
@@ -148,6 +222,16 @@ export class Catalyst {
 
         // Don't update if eliminated
         if (this.isEliminated) return;
+
+        // Update power-up timers
+        if (this.hasShield && this.shieldTimer > 0) {
+            this.shieldTimer--;
+            if (this.shieldTimer === 0) this.hasShield = false;
+        }
+        if (this.hasSpeedBoost && this.speedBoostTimer > 0) {
+            this.speedBoostTimer--;
+            if (this.speedBoostTimer === 0) this.hasSpeedBoost = false;
+        }
 
         // Update territory-based power multipliers
         this.updatePowerMultipliers(frameCount);
@@ -320,6 +404,15 @@ export class Catalyst {
         let maxSpeed = config.catalyst.maxSpeed * this.speedMultiplier;
         if (this.mode === 'chase') {
             maxSpeed *= config.catalyst.hunterSpeedBoost;
+        }
+
+        // Territory speed modifier
+        const territorySpeedMult = this.getTerritorySpeedMultiplier(grid);
+        maxSpeed *= territorySpeedMult;
+
+        // Speed boost power-up
+        if (this.hasSpeedBoost && this.speedBoostTimer > 0) {
+            maxSpeed *= config.powerups.types.speed.multiplier;
         }
 
         const speed = Math.sqrt(this.vx * this.vx + this.vy * this.vy);

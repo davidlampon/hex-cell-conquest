@@ -88,8 +88,9 @@ export class Renderer {
                 return;
             }
 
-            // Calculate visual size based on kill streak and power
-            const visualRadius = cat.radius * cat.impactMultiplier;
+            // Calculate visual size based on kill streak, power, and evolution
+            const evolutionBonus = config.evolution.stages[cat.evolutionStage].sizeBonus;
+            const visualRadius = cat.radius * cat.impactMultiplier * evolutionBonus;
 
             // Last Stand mode: RED pulsing aura
             if (cat.lastStandMode && cat.lastStandTimer > 0) {
@@ -132,11 +133,21 @@ export class Renderer {
                 this.ctx.fill();
             }
 
-            // Draw catalyst body (size based on power)
+            // Draw catalyst body (size based on power and evolution)
             this.ctx.beginPath();
             this.ctx.arc(cat.x, cat.y, visualRadius, 0, Math.PI * 2);
             this.ctx.fillStyle = config.colors[cat.color].light;
             this.ctx.fill();
+
+            // Shield visual effect
+            if (cat.hasShield && cat.shieldTimer > 0) {
+                const shieldPulse = 0.7 + 0.3 * Math.sin(Date.now() / 150);
+                this.ctx.beginPath();
+                this.ctx.arc(cat.x, cat.y, visualRadius + 6, 0, Math.PI * 2);
+                this.ctx.strokeStyle = `rgba(255, 255, 255, ${shieldPulse})`;
+                this.ctx.lineWidth = 3;
+                this.ctx.stroke();
+            }
 
             // Last Stand: Red pulsing border
             if (cat.lastStandMode && cat.lastStandTimer > 0) {
@@ -148,13 +159,17 @@ export class Renderer {
             }
             this.ctx.stroke();
 
-            // Draw mode symbol
+            // Draw evolution icon (if high stage) or mode symbol
             this.ctx.fillStyle = '#000000';
             this.ctx.font = 'bold 18px Arial';
             this.ctx.textAlign = 'center';
             this.ctx.textBaseline = 'middle';
 
-            if (cat.mode === 'flee') {
+            const evolutionIcon = config.evolution.stages[cat.evolutionStage].icon;
+            if (evolutionIcon) {
+                // High evolution stage: show crown or star
+                this.ctx.fillText(evolutionIcon, cat.x, cat.y);
+            } else if (cat.mode === 'flee') {
                 // Fleeing: scared face or retreat arrow
                 this.ctx.fillText('⚠', cat.x, cat.y);
             } else if (cat.mode === 'chase') {
@@ -202,6 +217,100 @@ export class Renderer {
                 size: 3 + Math.random() * 4
             });
         }
+    }
+
+    createNukeParticles(x, y, color) {
+        const particleCount = 80;
+        for (let i = 0; i < particleCount; i++) {
+            const angle = (Math.PI * 2 * i) / particleCount;
+            const speed = 5 + Math.random() * 10;
+            this.particles.push({
+                x,
+                y,
+                vx: Math.cos(angle) * speed,
+                vy: Math.sin(angle) * speed,
+                color: color,
+                life: 2.0,
+                size: 5 + Math.random() * 6
+            });
+        }
+    }
+
+    createResurrectionParticles(x, y, color) {
+        const particleCount = 50;
+        for (let i = 0; i < particleCount; i++) {
+            const angle = (Math.PI * 2 * i) / particleCount;
+            const speed = 4 + Math.random() * 6;
+            this.particles.push({
+                x,
+                y,
+                vx: Math.cos(angle) * speed * -1, // Converge inward
+                vy: Math.sin(angle) * speed * -1,
+                color: color,
+                life: 1.2,
+                size: 4 + Math.random() * 5
+            });
+        }
+    }
+
+    drawPowerups(powerups) {
+        powerups.forEach(powerup => {
+            if (!powerup.active) return;
+
+            const powerupConfig = config.powerups.types[powerup.type];
+            const alpha = powerup.life < 120 ? powerup.life / 120 : 1.0; // Fade when expiring
+
+            // Pulsing glow
+            const pulse = 0.6 + 0.4 * Math.sin(Date.now() / 200);
+            this.ctx.globalAlpha = alpha * pulse;
+
+            // Outer glow
+            this.ctx.beginPath();
+            this.ctx.arc(powerup.x, powerup.y, config.powerups.zoneRadius, 0, Math.PI * 2);
+            const gradient = this.ctx.createRadialGradient(
+                powerup.x, powerup.y, 0,
+                powerup.x, powerup.y, config.powerups.zoneRadius
+            );
+            gradient.addColorStop(0, powerupConfig.color + 'AA');
+            gradient.addColorStop(1, powerupConfig.color + '00');
+            this.ctx.fillStyle = gradient;
+            this.ctx.fill();
+
+            this.ctx.globalAlpha = alpha;
+
+            // Inner hexagon
+            this.ctx.beginPath();
+            for (let i = 0; i < 6; i++) {
+                const angle = (Math.PI / 3) * i - Math.PI / 6;
+                const radius = 15 + 3 * Math.sin(Date.now() / 300 + i);
+                const hx = powerup.x + radius * Math.cos(angle);
+                const hy = powerup.y + radius * Math.sin(angle);
+                if (i === 0) this.ctx.moveTo(hx, hy);
+                else this.ctx.lineTo(hx, hy);
+            }
+            this.ctx.closePath();
+            this.ctx.fillStyle = powerupConfig.color;
+            this.ctx.fill();
+            this.ctx.strokeStyle = '#FFFFFF';
+            this.ctx.lineWidth = 2;
+            this.ctx.stroke();
+
+            // Icon
+            this.ctx.fillStyle = '#000000';
+            this.ctx.font = 'bold 16px Arial';
+            this.ctx.textAlign = 'center';
+            this.ctx.textBaseline = 'middle';
+
+            let icon = '';
+            if (powerup.type === 'shield') icon = '🛡';
+            else if (powerup.type === 'speed') icon = '⚡';
+            else if (powerup.type === 'nuke') icon = '💣';
+            else if (powerup.type === 'resurrection') icon = '✨';
+
+            this.ctx.fillText(icon, powerup.x, powerup.y);
+
+            this.ctx.globalAlpha = 1;
+        });
     }
 
     updateAndDrawParticles() {
@@ -258,9 +367,10 @@ export class Renderer {
         }
     }
 
-    render(grid, catalysts, announcements = []) {
+    render(grid, catalysts, announcements = [], powerups = []) {
         this.clear();
         this.drawGrid(grid);
+        this.drawPowerups(powerups);
         this.updateAndDrawParticles();
         this.drawCatalysts(catalysts);
         this.drawAnnouncements(announcements);

@@ -58,5 +58,45 @@ export const config = {
     },
     animation: {
         colorTransitionSpeed: 0.1 // for smooth color transitions
+    },
+    powerups: {
+        spawnInterval: 900, // 15 seconds at 60fps
+        spawnIntervalVariance: 300, // +/- 5 seconds
+        types: {
+            shield: {
+                duration: 300, // 5 seconds
+                color: '#FFFFFF',
+                name: 'Shield'
+            },
+            speed: {
+                duration: 480, // 8 seconds
+                multiplier: 1.5, // +50% speed
+                color: '#FFD700',
+                name: 'Speed Boost'
+            },
+            nuke: {
+                territoryConversion: 0.10, // 10% of grid
+                color: '#9B59B6',
+                name: 'Nuke'
+            },
+            resurrection: {
+                color: '#2ECC71',
+                name: 'Resurrection'
+            }
+        },
+        zoneRadius: 25, // pickup radius
+        lifeDuration: 600 // 10 seconds before despawn
+    },
+    evolution: {
+        stages: [
+            { kills: 0, sizeBonus: 1.0, name: 'Recruit', icon: null },
+            { kills: 3, sizeBonus: 1.1, name: 'Veteran', icon: null },
+            { kills: 6, sizeBonus: 1.2, name: 'Elite', icon: '⭐' },
+            { kills: 10, sizeBonus: 1.3, name: 'Legend', icon: '👑' }
+        ]
+    },
+    territory: {
+        ownTerritorySpeedBonus: 1.2, // +20% on own territory
+        enemyTerritorySpeedPenalty: 0.9 // -10% on enemy territory
     }
 };

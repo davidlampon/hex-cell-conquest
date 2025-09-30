@@ -27,6 +27,10 @@ class Game {
         this.announcements = [];
         this.lastStandAnnounced = [false, false, false];
 
+        // Power-up system
+        this.powerups = [];
+        this.nextPowerupSpawn = this.getNextPowerupTime();
+
         this.setupEventHandlers();
         this.initialize();
         this.animate();
@@ -88,6 +92,107 @@ class Game {
         ];
 
         this.frameCount = 0;
+        this.powerups = [];
+        this.nextPowerupSpawn = this.getNextPowerupTime();
+    }
+
+    getNextPowerupTime() {
+        const variance = Math.random() * config.powerups.spawnIntervalVariance * 2 - config.powerups.spawnIntervalVariance;
+        return this.frameCount + config.powerups.spawnInterval + variance;
+    }
+
+    spawnPowerup() {
+        const types = ['shield', 'speed', 'nuke', 'resurrection'];
+        const type = types[Math.floor(Math.random() * types.length)];
+
+        // Random position on canvas
+        const x = 100 + Math.random() * (this.canvas.width - 200);
+        const y = 100 + Math.random() * (this.canvas.height - 200);
+
+        this.powerups.push({
+            type,
+            x,
+            y,
+            life: config.powerups.lifeDuration,
+            active: true
+        });
+    }
+
+    checkPowerupCollisions() {
+        this.powerups.forEach((powerup, index) => {
+            if (!powerup.active) return;
+
+            this.catalysts.forEach(cat => {
+                if (!cat.isAlive || cat.isEliminated) return;
+
+                const dx = cat.x - powerup.x;
+                const dy = cat.y - powerup.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < config.powerups.zoneRadius) {
+                    // Pickup!
+                    this.applyPowerup(cat, powerup.type);
+                    powerup.active = false;
+                }
+            });
+        });
+
+        // Remove inactive powerups
+        this.powerups = this.powerups.filter(p => p.active && p.life > 0);
+    }
+
+    applyPowerup(catalyst, type) {
+        switch(type) {
+            case 'shield':
+                catalyst.activateShield();
+                break;
+            case 'speed':
+                catalyst.activateSpeedBoost();
+                break;
+            case 'nuke':
+                this.applyNuke(catalyst);
+                this.addAnnouncement('nuke', catalyst.color);
+                this.audio.playDominating(); // Epic sound
+                break;
+            case 'resurrection':
+                this.resurrectAlly(catalyst);
+                this.addAnnouncement('resurrection', catalyst.color);
+                this.audio.playTripleKill(); // Resurrection sound
+                break;
+        }
+    }
+
+    applyNuke(catalyst) {
+        const conversionCount = Math.floor(this.grid.rows * this.grid.cols * config.powerups.types.nuke.territoryConversion);
+        let converted = 0;
+
+        // Convert random enemy cells
+        while (converted < conversionCount) {
+            const row = Math.floor(Math.random() * this.grid.rows);
+            const col = Math.floor(Math.random() * this.grid.cols);
+            const cell = this.grid.getCell(row, col);
+
+            if (cell.color !== catalyst.color) {
+                this.grid.setCell(row, col, catalyst.color, config.grid.maxStrength, this.frameCount);
+                converted++;
+            }
+        }
+
+        // Particle explosion at catalyst
+        this.renderer.createNukeParticles(catalyst.x, catalyst.y, catalyst.color);
+    }
+
+    resurrectAlly(catalyst) {
+        // Find dead ally (same color)
+        const deadAlly = this.catalysts.find(c =>
+            c.color === catalyst.color && !c.isAlive && !c.isEliminated
+        );
+
+        if (deadAlly) {
+            deadAlly.respawnTimer = 0; // Instant respawn
+            deadAlly.respawn();
+            this.renderer.createResurrectionParticles(deadAlly.x, deadAlly.y, deadAlly.color);
+        }
     }
 
     reset() {
@@ -96,6 +201,8 @@ class Game {
         this.renderer.particles = []; // Clear particles
         this.announcements = [];
         this.lastStandAnnounced = [false, false, false];
+        this.powerups = [];
+        this.nextPowerupSpawn = this.getNextPowerupTime();
     }
 
     addAnnouncement(type, color) {
@@ -103,6 +210,8 @@ class Game {
         if (type === 2) text = 'DOUBLE KILL!';
         else if (type === 3) text = 'TRIPLE KILL!';
         else if (type >= 4) text = 'DOMINATING!';
+        else if (type === 'nuke') text = 'NUCLEAR STRIKE!';
+        else if (type === 'resurrection') text = 'RESURRECTION!';
         else if (type === 'laststand') text = 'LAST STAND!';
 
         if (text) {
@@ -133,6 +242,18 @@ class Game {
             this.catalysts.forEach(cat => {
                 cat.update(this.catalysts, this.grid, this.frameCount);
             });
+
+            // Spawn power-ups
+            if (this.frameCount >= this.nextPowerupSpawn) {
+                this.spawnPowerup();
+                this.nextPowerupSpawn = this.getNextPowerupTime();
+            }
+
+            // Update powerup lifetimes
+            this.powerups.forEach(p => p.life--);
+
+            // Check powerup collisions
+            this.checkPowerupCollisions();
 
             // Handle catalyst collisions
             const collision = Catalyst.handleCollisions(this.catalysts, this.frameCount);
@@ -238,7 +359,7 @@ class Game {
 
     animate() {
         this.update();
-        this.renderer.render(this.grid, this.catalysts, this.announcements);
+        this.renderer.render(this.grid, this.catalysts, this.announcements, this.powerups);
         this.animationId = requestAnimationFrame(() => this.animate());
     }
 }
